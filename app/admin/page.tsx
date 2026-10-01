@@ -1,46 +1,53 @@
+export const dynamic = 'force-dynamic'
 'use client'
+
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 
-export default function Admin() {
-  const [stations, setStations] = useState<any[]>([])
-  const [candidates, setCandidates] = useState<any[]>([])
-  const [stationId, setStationId] = useState('')
-  const [votes, setVotes] = useState<any>({})
+export default function AdminPage() {
+  const [cases, setCases] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const loadCases = async () => {
+    setLoading(true)
+    const { data, error } = await supabase.from('cases').select('*').order('created_at', { ascending: false })
+    if (!error && data) setCases(data)
+    if (error) console.log(error)
+    setLoading(false)
+  }
 
   useEffect(() => {
-    supabase.from('hakitally_stations').select('*').then(({data})=> data && setStations(data))
-    supabase.from('hakitally_candidates').select('*').then(({data})=> data && setCandidates(data))
+    loadCases()
   }, [])
 
-  const submit = async () => {
-    for (const cand of candidates) {
-      const v = parseInt(votes[cand.id] || '0')
-      await supabase.from('hakitally_results_34a').upsert({
-        station_id: stationId,
-        candidate_id: cand.id,
-        votes: v
-      }, { onConflict: 'station_id,candidate_id' })
-    }
-    alert('Results saved! Go to homepage to see tally.')
+  const updateStatus = async (id: number, status: string) => {
+    await supabase.from('cases').update({ status }).eq('id', id)
+    loadCases()
   }
 
   return (
-    <div style={{padding:20, maxWidth:600, margin:'0 auto'}}>
-      <h1>Presiding Officer - Enter 34A</h1>
-      <select value={stationId} onChange={e=>setStationId(e.target.value)} style={{width:'100%', padding:10, margin:'10px 0'}}>
-        <option value="">Select Station</option>
-        {stations.map(s=><option key={s.id} value={s.id}>{s.code} - {s.name} - Reg: {s.registered_voters}</option>)}
-      </select>
-      {candidates.map(c=>(
-        <div key={c.id} style={{margin:'10px 0'}}>
-          <label>{c.name} votes:</label>
-          <input type="number" style={{width:'100%', padding:10, border:'1px solid #ccc'}} 
-          value={votes[c.id]||''} onChange={e=>setVotes({...votes, [c.id]: e.target.value})} />
-        </div>
-      ))}
-      <button onClick={submit} style={{width:'100%', padding:12, background:'green', color:'white', borderRadius:8, marginTop:10}}>Submit 34A Results</button>
-      <a href="/" style={{display:'block', marginTop:15}}>← Back to Public Tally</a>
+    <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px', fontFamily: 'Arial' }}>
+      <h1 style={{ color: '#0a4a2a' }}>HakiTally - Admin Panel</h1>
+      <button onClick={loadCases} style={{ padding: '8px 15px', marginBottom: '15px' }}>Refresh</button>
+      <a href="/" style={{ marginLeft: '20px' }}>← Back to Home</a>
+
+      {loading ? <p>Loading cases...</p> : null}
+
+      {cases.length === 0 && !loading && <p>No cases yet. Create 'cases' table in Supabase.</p>}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {cases.map((c) => (
+          <div key={c.id} style={{ border: '1px solid #ddd', padding: '15px', borderRadius: '8px', background: 'white' }}>
+            <b>{c.reporter_name}</b> - {c.phone} - <i>{c.location}</i><br />
+            <p>{c.description}</p>
+            <small>{c.created_at ? new Date(c.created_at).toLocaleString() : ''} | Status: <b>{c.status}</b></small>
+            <div style={{ marginTop: '10px', display: 'flex', gap: '10px' }}>
+              <button onClick={() => updateStatus(c.id, 'in_progress')} style={{ background: '#ffc107', border: 'none', padding: '6px 10px', borderRadius: '5px' }}>In Progress</button>
+              <button onClick={() => updateStatus(c.id, 'resolved')} style={{ background: '#28a745', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '5px' }}>Resolved</button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
