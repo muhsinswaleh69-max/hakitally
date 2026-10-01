@@ -1,13 +1,11 @@
-export const dynamic = 'force-dynamic'
 'use client'
+export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 export default function Home(){
   const [results,setResults]=useState<any[]>([])
-  useEffect(()=>{ 
-    supabase.from('results').select('*').then(({data})=>{ if(data) setResults(data) }) 
-  },[])
+  useEffect(()=>{ supabase.from('results').select('*').then(({data})=>{ if(data) setResults(data) }) },[])
   const total = 50
   const reported = results.length
   const percent = total > 0 ? Math.round((reported/total)*100) : 0
