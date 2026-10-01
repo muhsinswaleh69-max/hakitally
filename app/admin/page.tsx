@@ -1,5 +1,5 @@
-export const dynamic = 'force-dynamic'
 'use client'
+export const dynamic = 'force-dynamic'
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 
@@ -7,7 +7,6 @@ export default function Admin(){
   const [station,setStation]=useState('')
   const [votes,setVotes]=useState('')
   const [loading,setLoading]=useState(false)
-
   const submit = async (e:any)=>{
     e.preventDefault()
     setLoading(true)
@@ -16,7 +15,6 @@ export default function Admin(){
     else { alert('Saved!'); setStation(''); setVotes('') }
     setLoading(false)
   }
-
   return (
     <div style={{maxWidth:'500px',margin:'20px auto',padding:'20px',background:'white',borderRadius:'10px'}}>
       <h1>Admin - Presiding Officer</h1>
