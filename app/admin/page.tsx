@@ -1,51 +1,46 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '../../lib/supabase'
 
-export default function Admin(){
+export default function Admin() {
   const [stations, setStations] = useState<any[]>([])
   const [candidates, setCandidates] = useState<any[]>([])
   const [stationId, setStationId] = useState('')
-  const [votes, setVotes] = useState<{[key:string]:number}>({})
+  const [votes, setVotes] = useState<any>({})
 
-  useEffect(()=>{
-    supabase.from('hakitally_stations').select('*').then(({data})=>setStations(data||[]))
-    supabase.from('hakitally_candidates').select('*').then(({data})=>setCandidates(data||[]))
-  },[])
+  useEffect(() => {
+    supabase.from('hakitally_stations').select('*').then(({data})=> data && setStations(data))
+    supabase.from('hakitally_candidates').select('*').then(({data})=> data && setCandidates(data))
+  }, [])
 
-  const submit = async ()=>{
-    for(const cand of candidates){
-      await supabase.from('hakitally_results_34a').insert({
+  const submit = async () => {
+    for (const cand of candidates) {
+      const v = parseInt(votes[cand.id] || '0')
+      await supabase.from('hakitally_results_34a').upsert({
         station_id: stationId,
         candidate_id: cand.id,
-        votes: votes[cand.id]||0
-      })
+        votes: v
+      }, { onConflict: 'station_id,candidate_id' })
     }
-    alert('34A Saved! Check home page')
+    alert('Results saved! Go to homepage to see tally.')
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">Enter Form 34A</h1>
-      <select className="w-full border p-3 rounded-xl mb-4" onChange={e=>setStationId(e.target.value)}>
-        <option>Select Polling Station</option>
-        {stations.map(s=><option key={s.id} value={s.id}>{s.code} - {s.name} ({s.county})</option>)}
+    <div style={{padding:20, maxWidth:600, margin:'0 auto'}}>
+      <h1>Presiding Officer - Enter 34A</h1>
+      <select value={stationId} onChange={e=>setStationId(e.target.value)} style={{width:'100%', padding:10, margin:'10px 0'}}>
+        <option value="">Select Station</option>
+        {stations.map(s=><option key={s.id} value={s.id}>{s.code} - {s.name} - Reg: {s.registered_voters}</option>)}
       </select>
-
       {candidates.map(c=>(
-        <div key={c.id} className="flex justify-between items-center mb-3 bg-white p-3 rounded-xl">
-          <span>{c.name}</span>
-          <input type="number" className="border p-2 w-24 rounded-lg"
-            onChange={e=>setVotes({...votes, [c.id]: parseInt(e.target.value)})} placeholder="Votes" />
+        <div key={c.id} style={{margin:'10px 0'}}>
+          <label>{c.name} votes:</label>
+          <input type="number" style={{width:'100%', padding:10, border:'1px solid #ccc'}} 
+          value={votes[c.id]||''} onChange={e=>setVotes({...votes, [c.id]: e.target.value})} />
         </div>
       ))}
-
-      <button onClick={submit} className="w-full bg-black text-white p-3 rounded-xl mt-4">Submit Tally</button>
-
-      <div className="mt-8 p-4 bg-slate-100 rounded-xl">
-        <p className="text-xs">To add stations quickly, run in Supabase SQL:</p>
-        <code className="text-xs">insert into hakitally_stations (code, name, county, constituency, registered_voters) values ('001/001', 'Mumias Primary', 'Kakamega', 'Mumias West', 500);</code>
-      </div>
+      <button onClick={submit} style={{width:'100%', padding:12, background:'green', color:'white', borderRadius:8, marginTop:10}}>Submit 34A Results</button>
+      <a href="/" style={{display:'block', marginTop:15}}>← Back to Public Tally</a>
     </div>
   )
 }
