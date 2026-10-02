@@ -50,7 +50,7 @@ const COUNTY_DATA: any = {
     "Musanda": ["Musanda Primary","Musanda Sec","Musanda Market","Musanda Chief Office","Musanda Township","Musanda DEB","St Joseph Musanda","Musanda Polytechnic","Musanda Dispensary","Musanda Central"]
   },
   "Mumias East": {
-    "Lusheya/Lubinu": ["Shibale Primary","Lubinu Primary","Matawa Primary","Lubinu Sec","Lusheya Primary","Shibale Sec","Elwakana Primary","Makunga Primary Lubinu","Indangalasia Primary","Emakhwale Lubinu","St Joseph Shibale","Malaha Lubinu"],
+    "Lusheya/Lubinu": ["Shibale Primary","Lubinu Primary","Matawa Primary","Lubinu Sec","Lusheya Primary","Shibale Sec","Elwakana Primary","Makunga Primary Lubinu","Indangalasia Primary","Emakhwale Lubinu","St Joseph Shibale","Malaha Lubinu","Light Junior","Clever Bee","Shillo Pri."],
     "Malaha/Isongo/Makunga": ["Malaha Primary","Isongo Primary","Makunga Primary","Malaha Sec","Isongo Sec","Makunga Sec","Emasatsi Primary","Emakale Primary","Eshiakhulo Makunga","Mwitoti Primary","Khaimba Primary","Malaha Polytechnic"],
     "East Wanga": ["Mwitoti Primary","Musango Primary","Nyapora Primary","Khaimba Primary East","Mwitoti Sec","Elureko Primary","Namabhu Primary","Mumias Sugar East","Emukaya Primary","Eshikoye Primary","Eshirumba Primary","Ekero Muslim East"]
   },
@@ -97,18 +97,21 @@ export default function Admin(){
   const [votes,setVotes]=useState({barasa:0,malala:0,khalwale:0,muhanda:0})
   const [lockedStations,setLockedStations]=useState<Set<string>>(new Set())
   const [loading,setLoading]=useState(false)
+  const [lastSync,setLastSync]=useState('')
 
   const refreshLocks = async ()=>{
     const {data}=await supabase.from('results').select('constituency,ward,station_name')
     if(data){
       const set = new Set(data.map((r:any)=> `${r.constituency}|${r.ward}|${r.station_name}`))
       setLockedStations(set as any)
+      setLastSync(new Date().toLocaleTimeString())
     }
   }
 
   useEffect(()=>{
     refreshLocks()
-    const channel = supabase.channel('lock-watcher').on('postgres_changes',{event:'INSERT',schema:'public',table:'results'},(payload:any)=>{
+    const poll = setInterval(refreshLocks, 3000)
+    const channel = supabase.channel('lock-watcher-v2').on('postgres_changes',{event:'INSERT',schema:'public',table:'results'},(payload:any)=>{
       const r:any = payload.new
       const key = `${r.constituency}|${r.ward}|${r.station_name}`
       setLockedStations(prev=>{
@@ -117,26 +120,31 @@ export default function Admin(){
         return next as any
       })
     }).subscribe()
-    return ()=>{ supabase.removeChannel(channel) }
+    return ()=>{ clearInterval(poll); supabase.removeChannel(channel) }
   },[])
+
+  useEffect(()=>{ if(ward) refreshLocks() }, [ward])
 
   const submit = async (e:any)=>{
     e.preventDefault()
     const key = `${constituency}|${ward}|${station}`
-    if(lockedStations.has(key)){ alert(`🔒 LOCKED: ${station} already sent!`); return }
+    if(lockedStations.has(key)){ alert(`🔒 LOCKED: ${station} already sent from main server!`); return }
     setLoading(true)
     const payload = { constituency, ward, station_name: station, barasa_votes: votes.barasa, malala_votes: votes.malala, khalwale_votes: votes.khalwale, muhanda_votes: votes.muhanda, total_votes: votes.barasa+votes.malala+votes.khalwale+votes.muhanda }
     try{
-      const {error}:any=await supabase.from('results').insert([payload]); if(error) throw error
+      const {error}:any=await supabase.from('results').insert([payload])
+      if(error) throw error
       setLockedStations(prev=>{
         const next = new Set(prev)
         next.add(key)
         return next as any
       })
-      alert(`✅ Locked! ${station} sent and locked.`)
+      alert(`✅ Locked! ${station} sent and locked on ALL devices.`)
     }catch(err:any){
-      if(err.code==='23505'){ alert(`🔒 Already locked by another clerk!`); setLockedStations(prev=>{ const next=new Set(prev); next.add(key); return next as any })}
-      else alert(`Error: ${err.message}`)
+      if(err.code==='23505'){
+        alert(`🔒 Blocked by main server: ${station} already submitted!`)
+        setLockedStations(prev=>{ const next=new Set(prev); next.add(key); return next as any })
+      } else alert(`Error: ${err.message}`)
     }
     setLoading(false); setStation(''); setVotes({barasa:0,malala:0,khalwale:0,muhanda:0})
   }
@@ -146,22 +154,29 @@ export default function Admin(){
 
   return (
     <div style={{maxWidth:'560px',margin:'10px auto',padding:'16px',background:'white',borderRadius:'14px',fontFamily:'sans-serif'}}>
-      <div style={{padding:'10px',background:'#dcfce7',borderRadius:'8px',fontSize:'12px',textAlign:'center',marginBottom:'12px',fontWeight:'bold'}}>🟢 All Computers Synced | Locked: {lockedStations.size} stations</div>
-      <h1 style={{fontWeight:'bold'}}>CLERK ENTRY - {constituency}</h1>
-      <p style={{fontSize:'11px',color:'#666'}}>Once sent, station locks across ALL computers</p>
+      <div style={{padding:'10px',background:'#dcfce7',borderRadius:'8px',fontSize:'11px',textAlign:'center',marginBottom:'12px',fontWeight:'bold'}}>
+        🟢 Synced | Locked: {lockedStations.size} | Last check: {lastSync || 'now'}<br/>
+        <span style={{fontSize:'10px',fontWeight:'normal'}}>Auto-refresh 3s - Light Junior + Clever Bee + Shillo Added</span>
+      </div>
+      <h1 style={{fontWeight:'bold',margin:'0'}}>CLERK ENTRY - {constituency}</h1>
+      <p style={{fontSize:'11px',color:'#666',margin:'4px 0 8px 0'}}>Once sent, station locks across ALL computers instantly</p>
       <form onSubmit={submit} style={{display:'flex',flexDirection:'column',gap:'10px',marginTop:'12px'}}>
-        <select required value={constituency} onChange={e=>{setConstituency(e.target.value); setWard(''); setStation('')}} style={{padding:'14px',border:'2px solid #0a4a2a',borderRadius:'8px'}}>{Object.keys(COUNTY_DATA).map(c=><option key={c} value={c}>{c}</option>)}</select>
-        <select required value={ward} onChange={e=>{setWard(e.target.value); setStation('')}} style={{padding:'14px',border:'1px solid #ccc',borderRadius:'8px'}}><option value="">-- Select Ward --</option>{wards.map((w:any)=><option key={w} value={w}>{w}</option>)}</select>
-        <select required value={station} onChange={e=>setStation(e.target.value)} style={{padding:'14px',border:'1px solid #ccc',borderRadius:'8px'}}><option value="">-- Select Station --</option>{stations.map((s:any)=>{ const locked = lockedStations.has(`${constituency}|${ward}|${s}`); return <option key={s} value={s} disabled={locked}>{locked? `🔒 ${s} - ALREADY SENT` : `📍 ${s}`}</option>})}</select>
+        <select required value={constituency} onChange={e=>{setConstituency(e.target.value); setWard(''); setStation('')}} style={{padding:'14px',border:'2px solid #0a4a2a',borderRadius:'8px',fontSize:'15px'}}>{Object.keys(COUNTY_DATA).map(c=><option key={c} value={c}>{c} - {Object.keys(COUNTY_DATA[c]).length} Wards</option>)}</select>
+        <select required value={ward} onChange={e=>{setWard(e.target.value); setStation(''); refreshLocks()}} style={{padding:'14px',border:'1px solid #ccc',borderRadius:'8px',fontSize:'15px'}}><option value="">-- Select Ward --</option>{wards.map((w:any)=><option key={w} value={w}>{w}</option>)}</select>
+        <select required value={station} onChange={e=>setStation(e.target.value)} style={{padding:'14px',border:'1px solid #ccc',borderRadius:'8px',fontSize:'15px'}}><option value="">-- Select Station --</option>{stations.map((s:any)=>{ const locked = lockedStations.has(`${constituency}|${ward}|${s}`); return <option key={s} value={s} disabled={locked}>{locked? `🔒 ${s} - ALREADY SENT` : `📍 ${s}`}</option>})}</select>
+        {station && lockedStations.has(`${constituency}|${ward}|${station}`) && <div style={{background:'#fee2e2',padding:'10px',borderRadius:'8px',color:'#dc2626',fontWeight:'bold',fontSize:'13px',textAlign:'center'}}>🔒 BLOCKED BY MAIN SERVER<br/>{station} already submitted.</div>}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
           <input required type="number" min="0" placeholder="Barasa (ODM)" value={votes.barasa||''} onChange={e=>setVotes({...votes,barasa:Number(e.target.value)})} style={{padding:'12px',border:'1px solid #ccc',borderRadius:'8px'}}/>
           <input required type="number" min="0" placeholder="Malala (DCP)" value={votes.malala||''} onChange={e=>setVotes({...votes,malala:Number(e.target.value)})} style={{padding:'12px',border:'1px solid #ccc',borderRadius:'8px'}}/>
           <input type="number" min="0" placeholder="Khalwale" value={votes.khalwale||''} onChange={e=>setVotes({...votes,khalwale:Number(e.target.value)})} style={{padding:'12px',border:'1px solid #ccc',borderRadius:'8px'}}/>
           <input type="number" min="0" placeholder="Muhanda" value={votes.muhanda||''} onChange={e=>setVotes({...votes,muhanda:Number(e.target.value)})} style={{padding:'12px',border:'1px solid #ccc',borderRadius:'8px'}}/>
         </div>
-        <button disabled={loading} style={{padding:'16px',background:'#0a4a2a',color:'white',borderRadius:'10px',fontWeight:'bold'}}>{loading?'Submitting...':'Submit & Lock Station ✓'}</button>
+        <button disabled={loading || (station && lockedStations.has(`${constituency}|${ward}|${station}`))} style={{padding:'16px',background:(station && lockedStations.has(`${constituency}|${ward}|${station}`))?'#9ca3af':'#0a4a2a',color:'white',borderRadius:'10px',fontWeight:'bold',fontSize:'16px'}}>{station && lockedStations.has(`${constituency}|${ward}|${station}`)? '🔒 LOCKED ON ALL DEVICES' : loading? 'Submitting...': 'Submit & Lock on ALL Devices ✓'}</button>
       </form>
-      <div style={{marginTop:'10px',fontSize:'10px',color:'#999',textAlign:'center'}}>Build: v12-lock-fix-final</div>
+      <div style={{marginTop:'12px',display:'flex',gap:'6px'}}>
+        <button onClick={refreshLocks} style={{flex:1,padding:'10px',background:'#e5e7eb',borderRadius:'8px',fontSize:'12px',fontWeight:'bold'}}>🔄 Force Sync with Main Server</button>
+      </div>
+      <div style={{marginTop:'10px',fontSize:'10px',color:'#999',textAlign:'center'}}>Build: v14-added-3-stations-LusheyaLubinu</div>
     </div>
   )
 }
