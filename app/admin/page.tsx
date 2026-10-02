@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -7,221 +7,131 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-const CONSTITUENCIES = ["Lugari","Likuyani","Malava","Lurambi","Navakholo","Mumias West","Mumias East","Matungu","Butere","Khwisero","Shinyalu","Ikolomani"];
+// YOUR 3 REAL CANDIDATES
+const REAL = [
+  "Sophia Manyasa (UDA)",
+  "Timothy Wanzetse (ODM)",
+  "Stanislaus Wanzetse (DCP)"
+];
 
-const STATIONS_BY_CONSTITUENCY: any = {
-  "Mumias East": [
-    { name: "Emakwale Lubinu", ward: "Lusheya/Lubinu" },
-    { name: "Indangalasia Primary", ward: "Lusheya/Lubinu" },
-    { name: "Lubinu Primary", ward: "Lusheya/Lubinu" },
-    { name: "Lubinu Sec", ward: "Lusheya/Lubinu" },
-    { name: "Lusheya Primary", ward: "Lusheya/Lubinu" },
-    { name: "Shibale Primary", ward: "Lusheya/Lubinu" },
-    { name: "Emakale Primary", ward: "Lusheya/Lubinu" },
-    { name: "Bumwende Primary", ward: "Lusheya/Lubinu" },
-    { name: "Eluche Primary", ward: "East Wanga" },
-    { name: "Mumias East DEB", ward: "East Wanga" },
-    { name: "Shianda Primary", ward: "East Wanga" },
-    { name: "Bubala Primary", ward: "East Wanga" },
-    { name: "Khaunga Primary", ward: "East Wanga" },
-    { name: "Isongo Primary", ward: "Malaha/Isongo/Makunga" },
-    { name: "Malaha Primary", ward: "Malaha/Isongo/Makunga" },
-    { name: "Makunga Primary", ward: "Malaha/Isongo/Makunga" },
-    { name: "Khaimba Primary", ward: "Malaha/Isongo/Makunga" },
-    { name: "Namalonda Primary", ward: "Malaha/Isongo/Makunga" },
-  ],
-  "Lugari": [{ name: "Lugari Primary", ward: "Lugari" }, { name: "Chekalini", ward: "Lugari" }],
-  "Matungu": [{ name: "Matungu Primary", ward: "Matungu" }],
-  "Mumias West": [{ name: "Mumias West Primary", ward: "Mumias West" }],
-};
+export default function AdminFixed() {
+  const [ward, setWard] = useState("Lusheya/Lubinu");
+  const [station, setStation] = useState("Emakwale Lubinu");
+  const [v1, setV1] = useState("");
+  const [v2, setV2] = useState("");
+  const [v3, setV3] = useState("");
+  const [log, setLog] = useState("Ready...");
+  const [loading, setLoading] = useState(false);
 
-const CANDIDATES_BY_RACE: any = {
-  Governor: [
-    { key: "barasa_votes", label: "Fernandes Barasa (ODM)" },
-    { key: "malala_votes", label: "Cleophas Malala (DCP)" },
-    { key: "khalwale_votes", label: "Boni Khalwale (IND)" },
-    { key: "muhanda_votes", label: "Elsie Muhanda" },
-  ],
-  Senator: [
-    { key: "sen_c1", label: "Seth Panyako (UDA)" },
-    { key: "sen_c2", label: "Naomi Shiyonga (ODM)" },
-    { key: "sen_c3", label: "Brian Luvanda (DCP)" },
-    { key: "sen_c4", label: "Boni Khalwale (UDA)" },
-  ],
-  "Woman Rep": [
-    { key: "wr_c1", label: "Fatuma Masito (ODM)" },
-    { key: "wr_c2", label: "Mercy Nakhumicha (UDA)" },
-    { key: "wr_c3", label: "Tindi Mwale (DCP)" },
-    { key: "wr_c4", label: "Elsie Muhanda (ODM)" },
-  ],
-  "MP - Mumias East": [
-    { key: "mp_c1", label: "Peter Salasya (DAP-K) - Incumbent" },
-    { key: "mp_c2", label: "Benjamin Washiali (UDA)" },
-    { key: "mp_c3", label: "Elon Wameyo (IND)" },
-  ],
-  MCA: [
-    { key: "mca_c1", label: "MCA Candidate 1" },
-    { key: "mca_c2", label: "MCA Candidate 2" },
-    { key: "mca_c3", label: "MCA Candidate 3" },
-  ]
-};
+  const stations = ward === "Lusheya/Lubinu"
+   ? ["Emakwale Lubinu", "Lubinu Primary S1", "Lubinu Primary S2", "Eluche Primary", "Khaimba Primary", "Shibale Primary S1", "Shibale Primary S2"]
+    : ward === "East Wanga"
+   ? ["East Wanga DEB S1", "Khaunga Primary", "Shianda Primary", "Mwitoti Primary", "Mumias Sugar Sec"]
+    : ["Malaha Primary S1", "Malaha Primary S2", "Isongo Primary", "Makunga Primary"];
 
-export default function ClerkEntryAllSeats() {
-  const [results, setResults] = useState<any[]>([]);
-  const [race, setRace] = useState("Governor");
-  const [constituency, setConstituency] = useState("Mumias East");
-  const [station, setStation] = useState("");
-  const [votes, setVotes] = useState<any>({});
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-
-  const fetchResults = async () => {
-    const { data } = await supabase.from("hakitally_results_34a").select("*");
-    setResults(data || []);
-  };
-
-  useEffect(() => {
-    fetchResults();
-    const ch = supabase.channel("clerk-all-seats").on("postgres_changes", { event: "*", schema: "public", table: "hakitally_results_34a" }, () => fetchResults()).subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, []);
-
-  const lockedStations = results.filter(r => r.constituency === constituency && r.race === race).map((r: any) => r.station_name);
-  const stationsList = STATIONS_BY_CONSTITUENCY[constituency] || STATIONS_BY_CONSTITUENCY["Mumias East"];
-  const selectedStationObj = stationsList.find((s: any) => s.name === station);
-  const isLocked = station? lockedStations.includes(station) : false;
-  const currentCandidates = CANDIDATES_BY_RACE[race] || CANDIDATES_BY_RACE["Governor"];
-
-  const handleVoteChange = (key: string, val: string) => {
-    setVotes((prev: any) => ({...prev, [key]: val }));
-  };
-
-  const submit = async (e: any) => {
-    e.preventDefault();
-    if (!file) { alert("Form 34A / 36A PHOTO REQUIRED"); return; }
-    if (isLocked) { alert("Already locked"); return; }
-
-    setUploading(true);
+  const handleSubmit = async () => {
+    setLoading(true);
+    setLog("Submitting...");
     try {
-      const fileName = `${Date.now()}_${constituency}_${station}_${race}.jpg`;
-      const { error: upErr } = await supabase.storage.from("form34a").upload(fileName, file);
-      if (upErr) throw upErr;
-      const { data: urlData } = supabase.storage.from("form34a").getPublicUrl(fileName);
+      if (!station) throw new Error("Pick station");
+      if (!v1 &&!v2 &&!v3) throw new Error("Enter at least 1 vote");
 
-      const payload: any = {
-        station_name: station,
-        ward: selectedStationObj?.ward || "Lusheya/Lubinu",
-        constituency: constituency,
-        county: "Kakamega",
-        race: race,
-        form_34a_url: urlData.publicUrl,
-        // Governor compat columns (for your main beautiful board)
-        barasa_votes: parseInt(votes["barasa_votes"] || "0"),
-        malala_votes: parseInt(votes["malala_votes"] || "0"),
-        khalwale_votes: parseInt(votes["khalwale_votes"] || "0"),
-        muhanda_votes: parseInt(votes["muhanda_votes"] || "0"),
-        // Store all as JSON for Senate/Woman Rep/MP/MCA
-        extra_votes: votes,
-      };
+      // Build votes object - order MUST match REAL array
+      const extra: any = {};
+      extra[REAL[0]] = parseInt(v1 || "0");
+      extra[REAL[1]] = parseInt(v2 || "0");
+      extra[REAL[2]] = parseInt(v3 || "0");
 
-      const { error } = await supabase.from("hakitally_results_34a").insert(payload);
-      if (error) throw error;
+      console.log("INSERTING:", { ward, station, extra });
 
-      alert(`${race} - ${station} Submitted to Main Server at Kakamega High School - LIVE!`);
-      setStation(""); setVotes({}); setFile(null);
-      (document.getElementById("form34a") as any).value = "";
-    } catch (err: any) {
-      alert("Error: " + err.message);
+      // Insert with ALL possible columns to avoid schema error
+      const { data, error } = await supabase
+       .from("hakitally_results_34a")
+       .insert([
+          {
+            constituency: "Mumias East",
+            ward: ward,
+            station_name: station,
+            extra_votes: extra,
+            // add all vote cols as 0 to satisfy old schema
+            governor_votes: 0,
+            senator_votes: 0,
+            womanrep_votes: 0,
+            mp_votes: 0,
+            mca_votes: parseInt(v1 || "0") + parseInt(v2 || "0") + parseInt(v3 || "0"),
+          },
+        ])
+       .select();
+
+      if (error) {
+        console.error(error);
+        setLog("❌ ERROR: " + error.message + " | Hint: Go to Supabase -> Table hakitally_results_34a -> RLS -> Disable RLS or Add Policy: Allow INSERT for anon");
+        alert("ERROR: " + error.message + "\n\nGo to Supabase Dashboard > Authentication > Policies > hakitally_results_34a > Enable INSERT for anon");
+      } else {
+        setLog(`✅ SUCCESS! ${station} saved: Sophia=${v1}, Timothy=${v2}, Stanislaus=${v3}. Now check MAIN board - it will update LIVE in 1 sec!`);
+        alert(`✅ SAVED! ${ward} - ${station}\n\nSophia Manyasa (UDA): ${v1}\nTimothy Wanzetse (ODM): ${v2}\nStanislaus Wanzetse (DCP): ${v3}\n\nGo to main link NOW - you will see % + ELECTED badge`);
+        setV1(""); setV2(""); setV3("");
+      }
+    } catch (e: any) {
+      setLog("❌ CATCH: " + e.message);
+      alert("Catch error: " + e.message);
     }
-    setUploading(false);
+    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f8f9] flex justify-center p-3">
-      <div className="w-full max-w-md bg-white rounded-[16px] shadow-sm border p-4">
-        {/* ONLINE BAR - Exact like screenshot */}
-        <div className="bg-[#e8f6f3] border border-[#c8e6de] rounded-lg p-2.5 text-center text-[11px] font-medium">
-          🟢 Online - {results.length} total synced | Queue: 0 | <span className="text-green-700 font-bold animate-pulse">● LIVE instant (no refresh)</span>
-        </div>
+    <div className="min-h-screen bg-white p-4">
+      <div className="max-w-[500px] mx-auto">
+        <p className="text-[10px] text-gray-500">Server: Kakamega High School - Auto sync 0.2KB</p>
+        <h1 className="font-black text-lg mt-2">HakiTally ADMIN - REAL NAMES FIX</h1>
 
-        <h1 className="font-black mt-4 text-[#3a0a3a] text-[15px]">CLERK ENTRY - Computer C - {constituency}</h1>
-        <p className="text-[10px] text-gray-500 mt-1">All computers A,B,C,D,E,F sync to same main server at Kakamega High School. Each submit = 0.2KB data. Offline saves auto-sync.</p>
-
-        <form onSubmit={submit} className="space-y-3 mt-4">
-          {/* RACE SELECTOR - NEW */}
-          <label className="text-[11px] font-bold">Electoral Seat</label>
-          <select value={race} onChange={(e) => { setRace(e.target.value); setVotes({}); }} className="w-full border-2 border-black rounded-xl p-3.5 font-bold bg-yellow-50">
-            <option>Governor</option>
-            <option>Senator</option>
-            <option>Woman Rep</option>
-            <option>MP - Mumias East</option>
-            <option>MCA</option>
-          </select>
-
-          {/* CONSTITUENCY */}
-          <label className="text-[11px] font-bold">Constituency (12)</label>
-          <select value={constituency} onChange={(e) => { setConstituency(e.target.value); setStation(""); }} className="w-full border-2 border-black rounded-xl p-3.5 font-medium">
-            {CONSTITUENCIES.map(c => <option key={c} value={c}>{c} - {results.filter(r=>r.constituency===c).length} stns</option>)}
-          </select>
-
-          {/* STATION */}
-          <select value={station} onChange={(e) => setStation(e.target.value)} className="w-full border rounded-xl p-3.5 text-[14px]" required>
-            <option value="">Select Station - {constituency} ({stationsList.length} stations)</option>
-            {stationsList.map((s: any) => (
-              <option key={s.name} value={s.name} disabled={lockedStations.includes(s.name)}>
-                {s.name} - {s.ward} {lockedStations.includes(s.name)? "🔒 Locked" : ""}
-              </option>
-            ))}
-          </select>
-
-          {station && (
-            <div className="text-[11px] bg-gray-50 p-2 rounded">Selected: <b>{station}</b> | Ward: <b>{selectedStationObj?.ward}</b> | Race: <b>{race}</b></div>
-          )}
-
-          {/* DYNAMIC CANDIDATE INPUTS - ALL SEATS */}
-          <div className="grid grid-cols-2 gap-2">
-            {currentCandidates.map((c: any) => (
-              <div key={c.key} className="flex flex-col">
-                <label className="text-[10px] font-bold text-gray-600">{c.label}</label>
-                <input
-                  type="number"
-                  placeholder="Votes"
-                  value={votes[c.key] || ""}
-                  onChange={(e) => handleVoteChange(c.key, e.target.value)}
-                  className="border rounded-lg p-3 text-sm"
-                  required
-                />
-              </div>
-            ))}
-          </div>
-
-          {/* FORM 34A */}
+        <div className="mt-4 space-y-3">
           <div>
-            <label className="text-[11px] font-bold">Form {race==="Governor"?"34A":race==="MP - Mumias East"||race==="MCA"?"35A":"36A"} Photo *</label>
-            <input id="form34a" type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] || null)} className="w-full border rounded-lg p-3 text-xs" required />
+            <label className="text-xs font-bold">Ward</label>
+            <select value={ward} onChange={(e) => setWard(e.target.value)} className="w-full p-3 border-2 rounded-xl font-bold">
+              <option>East Wanga</option>
+              <option>Lusheya/Lubinu</option>
+              <option>Malaha/Isongo/Makunga</option>
+            </select>
           </div>
 
-          <button disabled={uploading || isLocked} className="w-full bg-[#0f4c4c] text-white rounded-xl p-3.5 font-black text-sm disabled:bg-gray-300">
-            {isLocked? `🔒 ${station} Already Locked` : uploading? "Uploading to Main Server..." : `Submit ${race} to Main Server ✓`}
+          <div>
+            <label className="text-xs font-bold">Station - {ward}</label>
+            <select value={station} onChange={(e) => setStation(e.target.value)} className="w-full p-3 border-2 rounded-xl font-bold">
+              {stations.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+
+          <p className="text-xs">Selected: <b>{station}</b> | Ward: <b>{ward}</b> | Race: <b>MCA</b></p>
+
+          <div className="bg-gray-50 p-4 rounded-xl space-y-3 border-2">
+            <div>
+              <label className="font-black text-sm text-green-700">{REAL[0]} - Sophia Manyasa (UDA)</label>
+              <input type="number" inputMode="numeric" value={v1} onChange={(e) => setV1(e.target.value)} placeholder="Enter votes" className="w-full p-4 border-2 rounded-xl text-lg font-bold mt-1" />
+            </div>
+            <div>
+              <label className="font-black text-sm text-orange-700">{REAL[1]} - Timothy Wanzetse (ODM)</label>
+              <input type="number" inputMode="numeric" value={v2} onChange={(e) => setV2(e.target.value)} placeholder="Enter votes" className="w-full p-4 border-2 rounded-xl text-lg font-bold mt-1" />
+            </div>
+            <div>
+              <label className="font-black text-sm text-purple-700">{REAL[2]} - Stanislaus Wanzetse (DCP)</label>
+              <input type="number" inputMode="numeric" value={v3} onChange={(e) => setV3(e.target.value)} placeholder="Enter votes" className="w-full p-4 border-2 rounded-xl text-lg font-bold mt-1" />
+            </div>
+          </div>
+
+          <button onClick={handleSubmit} disabled={loading} type="button" className="w-full bg-[#0a2e1f] text-white font-black p-5 rounded-full text-lg active:scale-95 transition">
+            {loading? "Submitting..." : "Submit MCA to Main Server ✓"}
           </button>
-        </form>
 
-        {/* HOW IT WORKS - Exact like screenshot */}
-        <div className="mt-6 text-[10px] text-gray-500 space-y-1 border-t pt-3">
-          <p className="font-bold">How multi-clerk + all seats works</p>
-          <p>• Computer A in Lugari, B in Mumias East, C in Matungu — same /admin link</p>
-          <p>• Select Race: Governor / Senator / Woman Rep / MP / MCA</p>
-          <p>• Select Constituency → Station → Enter votes → Form 34A</p>
-          <p>• 0.2KB per submit — works on 2G</p>
-          <p>• Main tally screen (hakitally.vercel.app) updates instantly - NO REFRESH</p>
-          <p className="pt-2 font-bold">Mumias East Wards: Lusheya/Lubinu (8), East Wanga (5), Malaha/Isongo/Makunga (5)</p>
-        </div>
+          <div className="bg-black text-green-400 p-3 rounded-xl text-xs font-mono min-h-[60px]">{log}</div>
 
-        {/* RECENT SUBMITS */}
-        <div className="mt-4 text-[11px]">
-          <p className="font-bold">Recent - {race}</p>
-          <div className="divide-y">
-            {results.filter(r=>r.race===race).slice(0,5).map((r:any)=><div key={r.id} className="py-1.5 flex justify-between"><span>{r.station_name} ({r.constituency})</span><span className="font-mono">{r.barasa_votes||0}-{r.malala_votes||0}</span></div>)}
+          <div className="text-[11px] text-gray-500">
+            <b>IF STILL NOT WORKING:</b><br/>
+            1. Supabase Dashboard → Table Editor → hakitally_results_34a → RLS → DISABLE RLS<br/>
+            2. Or create Policy: Allow ALL for anon<br/>
+            3. Then come back and click again - you will see alert SUCCESS
           </div>
         </div>
       </div>
