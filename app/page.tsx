@@ -1,47 +1,86 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
-const SUBCOUNTIES = ["Lugari","Likuyani","Malava","Lurambi","Navakholo","Mumias West","Mumias East","Matungu","Butere","Khwisero","Shinyalu","Ikolomani"];
-const WARDS:any = {
-  "Mumias East": ["East Wanga","Lusheya/Lubinu","Malaha/Isongo/Makunga"],
-  "Mumias West": ["Mumias Central","Mumias North","Etenje","Musanda"],
-  "Matungu": ["Koyonzo","Kholera","Khalaba","Mayoni","Namamali"],
-  "Lugari": ["Mautuma","Lugari","Lumakanda","Chekalini","Chevaywa","Lawandeti"],
-  "Likuyani": ["Likuyani","Sango","Kongoni","Nzoia","Lumakanda"],
-  "Malava": ["Manda-Shivanga","Matsakha","Lutaso","Ndalu","Matioli","Butali-Chegulo","Shivali"],
-  "Lurambi": ["Butsotso East","Butsotso South","Butsotso Central","Sheywe","Mahiakalo","Shirere"],
-  "Navakholo": ["Ingostse-Matiha","Shinoyi-Shikomari","Bunyala West","Bunyala East","Bunyala Central"],
-  "Butere": ["Marama West","Marama Central","Marama North","Marama South","Marenyo-Shianda"],
-  "Khwisero": ["Kisa North","Kisa East","Kisa West","Kisa Central"],
-  "Shinyalu": ["Isukha North","Murhanda","Isukha Central","Isukha South","Isukha East","Isukha West"],
-  "Ikolomani": ["Idakho South","Idakho East","Idakho North","Idakho Central"],
-};
-// EXPERIMENTAL - REAL NAMES - SAME ORDER IN BOTH FILES
-const EXPERIMENTAL_MCA = ["Sophia Manyasa (UDA)","Timothy Wanzetse (ODM)","Stanislaus Wanzetse (DCP)"];
+// YOUR REAL NAMES FOR EXPERIMENT - ORDER FIXED
+const REAL = [
+  "Sophia Manyasa (UDA)",
+  "Timothy Wanzetse (ODM)",
+  "Stanislaus Wanzetse (DCP)"
+];
 
-const MCA_CANDIDATES:any = {
-  "East Wanga": EXPERIMENTAL_MCA,
-  "Lusheya/Lubinu": EXPERIMENTAL_MCA,
-  "Malaha/Isongo/Makunga": EXPERIMENTAL_MCA,
-  "default": EXPERIMENTAL_MCA
+const WARDS = ["East Wanga","Lusheya/Lubinu","Malaha/Isongo/Makunga"];
+const STATIONS_BY_WARD:any = {
+  "Lusheya/Lubinu": ["Emakwale Lubinu","Lubinu Primary S1","Lubinu Primary S2","Eluche Primary","Khaimba Primary","Shibale Primary S1","Shibale Primary S2","Emukaya Primary"],
+  "East Wanga": ["East Wanga DEB S1","Khaunga Primary","Shianda Primary","Mwitoti Primary","Mumias Sugar Sec"],
+  "Malaha/Isongo/Makunga": ["Malaha Primary S1","Malaha Primary S2","Isongo Primary","Makunga Primary","Kholera Primary","Khainga Primary"]
 };
 
-export default function Page(){
-  const [race,setRace]=useState("MCA");
-  const [results,setResults]=useState<any[]>([]);
-  const [selectedSubcounty,setSelectedSubcounty]=useState<string|null>("Mumias East");
-  const [selectedWard,setSelectedWard]=useState("All");
-  useEffect(()=>{ const f=async()=>{const {data}=await supabase.from("hakitally_results_34a").select("*"); setResults(data||[]);}; f(); const ch=supabase.channel("exp-3").on("postgres_changes",{event:"*",schema:"public",table:"hakitally_results_34a"},()=>f()).subscribe(); return()=>{supabase.removeChannel(ch);};},[]);
-  const displaySubcounties = selectedSubcounty?[selectedSubcounty]:SUBCOUNTIES;
+export default function Admin(){
+  const [ward,setWard]=useState("Lusheya/Lubinu");
+  const [station,setStation]=useState("Emakwale Lubinu");
+  const [v1,setV1]=useState(""); const [v2,setV2]=useState(""); const [v3,setV3]=useState("");
+  const [msg,setMsg]=useState("");
+
+  const submit=async()=>{
+    if(!station){ setMsg("Select Station"); return; }
+    const extra:any={}; extra[REAL[0]]=parseInt(v1||"0"); extra[REAL[1]]=parseInt(v2||"0"); extra[REAL[2]]=parseInt(v3||"0");
+    const {error}=await supabase.from("hakitally_results_34a").insert([{
+      constituency:"Mumias East", ward, station_name: station, extra_votes: extra, mca_votes: parseInt(v1||"0")
+    }]);
+    if(error) setMsg("Error: "+error.message);
+    else { setMsg(`✓ LIVE! ${ward} - ${station} -> ${REAL[0]}=${v1}, ${REAL[1]}=${v2}, ${REAL[2]}=${v3} - Check MAIN BOARD NOW`); setV1(""); setV2(""); setV3(""); }
+  };
+
   return(
-    <div className="min-h-screen bg-[#f1f3f5]">
-      <div className="bg-[#0a2e1f] text-white p-5"><div className="max-w-[1700px] mx-auto"><h1 className="font-black text-2xl">HakiTally - KAKAMEGA COUNTY</h1><p className="text-sm opacity-80">MCA Experimental - {EXPERIMENTAL_MCA.join(" | ")} | {results.length} stations LIVE</p></div></div>
-      <div className="max-w-[1700px] mx-auto p-4">
-        <div className="bg-white p-4 rounded-xl mb-4"><div className="flex gap-2 flex-wrap">{SUBCOUNTIES.map(sc=><button key={sc} onClick={()=>setSelectedSubcounty(sc)} className={`px-3 py-1 rounded-full text-xs font-bold ${selectedSubcounty===sc?"bg-[#0a2e1f] text-white":"bg-gray-200"}`}>{sc}</button>)}</div><div className="flex gap-2 mt-3 flex-wrap border-t pt-3"><button onClick={()=>setSelectedWard("All")} className={`px-3 py-1 rounded-full text-xs font-bold ${selectedWard==="All"?"bg-black text-white":"bg-yellow-100"}`}>All Wards in {selectedSubcounty}</button>{(WARDS[selectedSubcounty||"Mumias East"]||[]).map((w:string)=><button key={w} onClick={()=>setSelectedWard(w)} className={`px-3 py-1 rounded-full text-xs font-bold ${selectedWard===w?"bg-black text-white":"bg-gray-100"}`}>{w}</button>)}</div></div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {displaySubcounties.map(sub=>{ const wardsList = selectedWard==="All"?(WARDS[sub]||[]):[selectedWard]; return wardsList.map((ward:string)=>{ const wardResults=results.filter((r:any)=>r.ward===ward); const cands = MCA_CANDIDATES[ward]||MCA_CANDIDATES.default; const votesArr=cands.map((_:any,idx:number)=>wardResults.reduce((s:any,r:any)=> s + parseInt((r.extra_votes?Object.values(r.extra_votes)[idx]:0) as any||0),0)); const total=votesArr.reduce((a:number,b:number)=>a+b,0)||1; const max=Math.max(...votesArr); const has=wardResults.length>0; return(<div key={sub+ward} className="bg-white rounded-xl p-5 border-l-[6px] border-l-[#0a2e1f]"><p className="font-black text-[13px]">{ward} Ward - {sub} - MCA Race - {wardResults.length} stns</p><div className="mt-4 space-y-3">{cands.map((cand:string,idx:number)=>{ const v=votesArr[idx]; const pct=has?(v/total*100):0; const isWinner=has&&v===max&&v>0; return(<div key={cand} className={`p-3 rounded-xl border ${isWinner?"bg-green-50 border-green-600 border-2":"bg-gray-50"}`}><div className="flex justify-between items-center"><span className="font-bold text-[12px]">{cand}</span>{isWinner&&<span className="bg-green-600 text-white text-[9px] font-black px-2 py-1 rounded-full animate-pulse">✓ ELECTED - WON - CONGRATULATIONS</span>}</div><div className="flex justify-between mt-2"><span className="text-xs font-black">{v.toLocaleString()} votes</span><span className="text-xs font-black">{pct.toFixed(1)}%</span></div><div className="w-full bg-gray-200 h-2.5 rounded-full mt-2 overflow-hidden"><div className={`h-2.5 rounded-full ${isWinner?"bg-green-600":"bg-[#0a2e1f]"}`} style={{width:`${pct}%`}}></div></div></div>);})}</div><p className="text-[10px] text-gray-400 mt-3">{has?`Stations: ${wardResults.map((r:any)=>r.station_name).join(", ")}`:"No Form 35A yet - Enter via /admin"}</p></div>);});})}
+    <div className="min-h-screen bg-[#f2f2f2] p-4">
+      <div className="max-w-[600px] mx-auto bg-white rounded-2xl shadow p-5">
+        <p className="text-[11px] text-gray-500">All computers A,B,C,D,E,F sync to same main server at Kakamega High School. 0.2KB per submit.</p>
+
+        <label className="font-black mt-4 block text-sm">Electoral Seat</label>
+        <select className="w-full p-3 border-2 rounded-xl bg-orange-50 font-bold mt-1"><option>MCA</option></select>
+
+        <label className="font-bold mt-4 block text-sm">Constituency (12)</label>
+        <select className="w-full p-3 border-2 rounded-xl bg-orange-50 font-bold mt-1"><option>Mumias East - 0 stns</option></select>
+
+        <label className="font-bold mt-4 block text-sm">Ward - Mumias East</label>
+        <select value={ward} onChange={e=>setWard(e.target.value)} className="w-full p-3 border-2 rounded-xl font-bold mt-1">
+          {WARDS.map(w=><option key={w} value={w}>{w}</option>)}
+        </select>
+
+        <label className="font-bold mt-4 block text-sm">Select Station - {ward}</label>
+        <select value={station} onChange={e=>setStation(e.target.value)} className="w-full p-3 border rounded-xl mt-1">
+          {(STATIONS_BY_WARD[ward]||[]).map((s:string)=><option key={s} value={s}>{s} - {ward}</option>)}
+        </select>
+
+        <p className="text-[12px] mt-3 text-gray-600">Selected: <b>{station}</b> | Ward: <b>{ward}</b> | Race: <b>MCA</b></p>
+
+        {/* REAL NAMES HERE - THIS IS THE FIX */}
+        <div className="grid grid-cols-2 gap-3 mt-5">
+          <div>
+            <label className="font-black text-[12px] text-[#0a2e1f]">{REAL[0]}</label>
+            <input type="number" value={v1} onChange={e=>setV1(e.target.value)} placeholder="Votes for Sophia" className="w-full p-3 border-2 rounded-xl font-bold mt-1 bg-green-50"/>
+          </div>
+          <div>
+            <label className="font-black text-[12px] text-[#0a2e1f]">{REAL[1]}</label>
+            <input type="number" value={v2} onChange={e=>setV2(e.target.value)} placeholder="Votes for Timothy" className="w-full p-3 border-2 rounded-xl font-bold mt-1 bg-orange-50"/>
+          </div>
+          <div className="col-span-2">
+            <label className="font-black text-[12px] text-[#0a2e1f]">{REAL[2]}</label>
+            <input type="number" value={v3} onChange={e=>setV3(e.target.value)} placeholder="Votes for Stanislaus" className="w-full p-3 border-2 rounded-xl font-bold mt-1 bg-purple-50"/>
+          </div>
+        </div>
+
+        <label className="text-sm mt-4 block">Form 35A Photo *</label><input type="file" className="mt-2"/>
+
+        <button onClick={submit} className="w-full bg-[#1a6fb5] text-white font-black p-4 rounded-full mt-6">Submit MCA to Main Server ✓</button>
+
+        {msg && <p className="bg-green-100 p-3 rounded-xl font-bold text-sm mt-3">{msg}</p>}
+
+        <div className="mt-4 bg-gray-50 p-3 rounded-xl">
+          <p className="text-[11px] font-bold">Live Main Stream:</p>
+          <p className="text-[11px]">Main link: / - When you submit Emakwale Lubinu, the bar for {ward} will update instantly. Highest votes gets GREEN badge <span className="bg-green-600 text-white px-2 py-0.5 rounded-full text-[10px]">✓ ELECTED - WON</span></p>
         </div>
       </div>
     </div>
