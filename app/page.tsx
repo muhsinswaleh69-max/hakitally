@@ -3,95 +3,153 @@ import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
-// COUNTY-WIDE (same everywhere)
-const COUNTY_RACES:any = {
-  Governor: [{name:"Fernandes Barasa (ODM)",short:"BARASA"}, {name:"Cleophas Malala (DCP)",short:"MALALA"}, {name:"Boni Khalwale (IND)",short:"KHALWALE"}],
-  Senator: [{name:"Edwin Sifuna (ODM)",short:"SIFUNA"}, {name:"Boni Khalwale (UDA)",short:"KHALWALE"}, {name:"George Khaniri (DCP)",short:"KHANIRI"}],
-  "Woman Rep": [{name:"Elsie Muhanda (ODM)",short:"ELSIE"}, {name:"Beatrice Adagala (UDA)",short:"ADAGALA"}, {name:"Rachael Otundo (DCP)",short:"OTUNDO"}],
+const WARDS_PER_SUBCOUNTY:any = {
+  "Mumias East":["East Wanga","Lusheya/Lubinu","Malaha/Isongo/Makunga"],
+  "Mumias West":["Mumias Central","Mumias North","Etenje","Musanda"],
+  "Matungu":["Koyonzo","Kholera","Khalaba","Mayoni","Namamali"],
+  "Shinyalu":["Murhanda","Isukha North","Isukha East","Isukha South","Isukha Central","Isukha West"],
+  "Lugari":["Mautuma","Lugari","Lumakanda","Chekalini","Chevaywa","Lwandeti"],
+  "Likuyani":["Likuyani","Sango","Kongoni","Nzoia","Sinoko"],
+  "Malava":["West Kabras","Chemuche","East Kabras","Butali-Chegulo","Manda-Shivanga","Matsakha","Shamakhokho"],
+  "Lurambi":["Butsotso East","Butsotso South","Butsotso Central","Sheywe","Mahiakalo","Shirere"],
+  "Navakholo":["Ingotse-Mathia","Shinoyi-Shikomari-Esumeyia","Bunyala West","Bunyala East","Bunyala Central"],
+  "Butere":["Marama West","Marama Central","Marama North","Marama South","Marenyo-Shianda"],
+  "Khwisero":["Kisa North","Kisa East","Kisa West","Kisa Central"],
+  "Ikolomani":["Idakho South","Idakho East","Idakho North","Idakho Central"],
 };
 
-// MP - DIFFERENT PER SUB-COUNTY (Constituency)
-const MP_CANDIDATES:any = {
-  "Mumias East": [{name:"Peter Nabulindo (ODM)",short:"NABULINDO"}, {name:"Benjamin Washiali (UDA)",short:"WASHIALI"}, {name:"David Were (DCP)",short:"WERE"}],
-  "Mumias West": [{name:"Johnson Naicca (ODM)",short:"NAICCA"}, {name:"Rashid Echesa (UDA)",short:"ECHESA"}, {name:"Tim Wanyonyi (DCP)",short:"WANYONYI"}],
-  "Matungu": [{name:"Peter Nabulindo (ODM)",short:"NABULINDO"}, {name:"Justus Murunga (UDA)",short:"MURUNGA"}, {name:"Oscar Nabulindo (DCP)",short:"OSCAR"}],
-  "Lugari": [{name:"Ayub Savula (ODM)",short:"SAVULA"}, {name:"Nabii Nabwera (UDA)",short:"NABWERA"}, {name:"Isaac Andabwa (DCP)",short:"ANDABWA"}],
-  "Likuyani": [{name:"Innocent Mugabe (ODM)",short:"MUGABE"}, {name:"Enock Kibunguchy (UDA)",short:"KIBUNGUCHY"}, {name:"Oscar Nabulindo (DCP)",short:"OSCAR"}],
-  "Malava": [{name:"Moses Malulu Injendi (ODM)",short:"MALULU"}, {name:"Moses Malulu (UDA)",short:"MALULU"}, {name:"Seth Panyako (DCP)",short:"PANYAKO"}],
-  "Lurambi": [{name:"Titus Khamala (ODM)",short:"KHAMALA"}, {name:"Bishop Owino (UDA)",short:"OWINO"}, {name:"Alfred Agoi (DCP)",short:"AGOI"}],
-  "Navakholo": [{name:"Emmanuel Wangwe (ODM)",short:"WANGWE"}, {name:"Elvis Chiche (UDA)",short:"CHICHE"}, {name:"Wilberforce Lutta (DCP)",short:"LUTTA"}],
-  "Butere": [{name:"Tindi Mwale (ODM)",short:"MWALE"}, {name:"Hillary Otsiula (UDA)",short:"OTSIULA"}, {name:"Andrew Toboso (DCP)",short:"TOBOSO"}],
-  "Khwisero": [{name:"Christopher Aseka (ODM)",short:"ASEKA"}, {name:"Julius Arunga (UDA)",short:"ARUNGA"}, {name:"Evans Lutta (DCP)",short:"LUTTA"}],
-  "Shinyalu": [{name:"Fred Ikana (ODM)",short:"IKANA"}, {name:"Justus Kizito (UDA)",short:"KIZITO"}, {name:"Omboko Milemba (DCP)",short:"MILEMBA"}],
-  "Ikolomani": [{name:"Bernard Shinali (ODM)",short:"SHINALI"}, {name:"Bonface Mukhwana (UDA)",short:"MUKHWANA"}, {name:"Vincent Malenya (DCP)",short:"MALENYA"}],
+const CANDIDATES:any = {
+  Governor: ["Fernandes Barasa (ODM)","Cleophas Malala (DCP)","Boni Khalwale (IND)"],
+  Senator: ["Edwin Sifuna (ODM)","Boni Khalwale (UDA)","George Khaniri (DCP)"],
+  "Woman Rep": ["Elsie Muhanda (ODM)","Beatrice Adagala (UDA)","Rachael Otundo (DCP)"],
+  MP: {
+    "Mumias East":["Peter Nabulindo (ODM)","Benjamin Washiali (UDA)","David Were (DCP)"],
+    "Shinyalu":["Fred Ikana (ODM)","Justus Kizito (UDA)","Omboko Milemba (DCP)"],
+    "Mumias West":["Johnson Naicca (ODM)","Rashid Echesa (UDA)","Tim Wanyonyi (DCP)"],
+    "Lugari":["Ayub Savula (ODM)","Nabii Nabwera (UDA)","Isaac Andabwa (DCP)"],
+    "Likuyani":["Innocent Mugabe (ODM)","Enock Kibunguchy (UDA)","Oscar Nabulindo (DCP)"],
+    "Malava":["Moses Malulu (ODM)","Seth Panyako (DCP)","Moses Malulu Injendi (UDA)"],
+    "Lurambi":["Titus Khamala (ODM)","Bishop Owino (UDA)","Alfred Agoi (DCP)"],
+    "Navakholo":["Emmanuel Wangwe (ODM)","Elvis Chiche (UDA)","Wilberforce Lutta (DCP)"],
+    "Butere":["Tindi Mwale (ODM)","Hillary Otsiula (UDA)","Andrew Toboso (DCP)"],
+    "Khwisero":["Christopher Aseka (ODM)","Julius Arunga (UDA)","Evans Lutta (DCP)"],
+    "Matungu":["Peter Oscar Nabulindo (ODM)","Justus Murunga (UDA)","Oscar Nabulindo (DCP)"],
+    "Ikolomani":["Bernard Shinali (ODM)","Bonface Mukhwana (UDA)","Vincent Malenya (DCP)"]
+  }
 };
 
-// MCA - DIFFERENT PER WARD
-const MCA_CANDIDATES:any = {
-  "East Wanga": [{name:"Sophia Manyasa (UDA)",short:"SOPHIA"}, {name:"Timothy Wanzetse (ODM)",short:"TIMOTHY"}, {name:"Stanislaus Wanzetse (DCP)",short:"WANZETSE"}],
-  "Lusheya/Lubinu": [{name:"John Wafula (ODM)",short:"WAFULA"}, {name:"Sophia Manyasa (UDA)",short:"SOPHIA"}, {name:"Patrick Kweyu (DCP)",short:"KWEYU"}],
-  "Malaha/Isongo/Makunga": [{name:"Moses Musango (ODM)",short:"MUSANGO"}, {name:"David Shikuku (UDA)",short:"SHIKUKU"}, {name:"Esther Okumu (DCP)",short:"OKUMU"}],
-  "Mautuma": [{name:"Mautuma MCA A (ODM)",short:"MAUTUMA A"}, {name:"Mautuma MCA B (UDA)",short:"MAUTUMA B"}, {name:"Mautuma MCA C (DCP)",short:"MAUTUMA C"}],
-  "Lugari": [{name:"Lugari MCA A (ODM)",short:"LUGARI A"}, {name:"Lugari MCA B (UDA)",short:"LUGARI B"}, {name:"Lugari MCA C (DCP)",short:"LUGARI C"}],
-  "default": [{name:"Candidate A (ODM)",short:"CAND A"}, {name:"Candidate B (UDA)",short:"CAND B"}, {name:"Candidate C (DCP)",short:"CAND C"}],
+const getMCACandidates = (ward:string) => {
+  const short = ward.split("/")[0].substring(0,6);
+  return [`MCA ${short} A (ODM)`,`MCA ${short} B (UDA)`,`MCA ${short} C (DCP)`];
 };
 
-const SUBCOUNTIES = Object.keys(MP_CANDIDATES);
-const WARDS_MAP:any = {"Mumias East":["East Wanga","Lusheya/Lubinu","Malaha/Isongo/Makunga"],"Lugari":["Mautuma","Lugari","Lumakanda"],"Likuyani":["Likuyani","Kongoni","Sango"],"Shinyalu":["Murhanda","Isukha North","Isukha South","Isukha Central","Isukha East","Isukha West"]};
+const SUBCOUNTIES = Object.keys(WARDS_PER_SUBCOUNTY);
 
 export default function Portal(){
-  const [tab,setTab]=useState("MP");
-  const [filter,setFilter]=useState("Shinyalu");
+  const [tab,setTab]=useState("MCA");
+  const [subcounty,setSubcounty]=useState("Mumias East");
+  const [wardFilter,setWardFilter]=useState("All Wards in Mumias East");
   const [results,setResults]=useState<any[]>([]);
+
   const fetchAll=async()=>{ const {data}=await supabase.from("hakitally_results_34a").select("*"); if(data) setResults(data); };
-  useEffect(()=>{ fetchAll(); const ch=supabase.channel("diff-names").on("postgres_changes",{event:"*",schema:"public",table:"hakitally_results_34a"},fetchAll).subscribe(); setInterval(fetchAll,2000); return()=>{supabase.removeChannel(ch);} },[]);
+  useEffect(()=>{ fetchAll(); const ch=supabase.channel("uniform-cards").on("postgres_changes",{event:"*",schema:"public",table:"hakitally_results_34a"},fetchAll).subscribe(); setInterval(fetchAll,2500); return()=>{supabase.removeChannel(ch);} },[]);
 
-  const getTally=(race:string, subcounty?:string, ward?:string)=>{
+  const getTally=(race:string, sc?:string, wd?:string)=>{
     let rows=results.filter(r=>r.race===race);
-    if(subcounty) rows=rows.filter(r=>r.constituency===subcounty || r.subcounty===subcounty || r.ward && WARDS_MAP[subcounty]?.includes(r.ward) || r.ward===subcounty);
-    if(ward) rows=rows.filter(r=>r.ward===ward);
-    if(race==="MP" && subcounty) rows=results.filter(r=>r.race==="MP" && (r.subcounty===subcounty || r.constituency===subcounty));
-    const tally:Record<string,number>={}; rows.forEach(r=>{ Object.entries(r.extra_votes||{}).forEach(([k,v]:any)=>{ tally[k]=(tally[k]||0)+v; }); });
+    if(sc) rows=rows.filter(r=>r.constituency===sc);
+    if(wd) rows=rows.filter(r=>r.ward===wd);
+    const tally:Record<string,number>={}; rows.forEach(r=>{ Object.entries(r.extra_votes||{}).forEach(([k,v]:any)=>{ tally[k]=(tally[k]||0)+(v as number); }); });
     const total=Object.values(tally).reduce((a:any,b:any)=>a+b,0) as number;
-    const sorted=Object.entries(tally).sort((a:any,b:any)=>b[1]-a[1]);
     const stns=new Set(rows.map(r=>r.station_name)).size;
-    return {tally,total,sorted,stns};
+    return {tally,total,stns,rows};
   };
 
-  const renderCountyRace=(race:string)=>{
-    const {tally,total,sorted,stns}=getTally(race);
-    const need=1200; const isComplete=stns>=need; const win=sorted[0] as any;
+  // Component for candidate card - EXACTLY like your screenshot
+  const CandidateCard = ({name, votes, total}:{name:string, votes:number, total:number}) => {
+    const pct = total? ((votes/total)*100).toFixed(1) : "0.0";
+    const isWinner = parseFloat(pct) > 50;
     return(
-      <div>
-        {isComplete && win && <div className="bg-green-600 text-white rounded-2xl p-5 text-center mb-5"><h2 className="text-[26px] font-black">🎉 CONGRATULATIONS {race.toUpperCase()} {win[0].split(" ")[0].toUpperCase()}! 🎉</h2><p>{win[0]} - {win[1].toLocaleString()} votes</p></div>}
-        <div className="grid md:grid-cols-3 gap-3">{COUNTY_RACES[race].map((c:any)=>{ const key=Object.keys(tally).find(k=>k.includes(c.short))||c.name; const v=tally[key]||0; const pct=total?Math.round(v/total*100):0; return(<div key={c.name} className={`bg-white rounded-xl p-4 shadow-sm ${win&&win[0]===key? "border-2 border-green-600":""}`}><p className="font-bold text-[13px]">{c.name}</p><p className="font-black text-[20px] mt-1">{v.toLocaleString()} <span className="text-[12px] text-gray-500">{pct}%</span></p><div className="w-full h-2 bg-gray-100 rounded-full mt-2"><div className="h-full bg-black" style={{width:`${pct}%`}}></div></div></div>); })}</div>
-        <p className="text-center text-[11px] text-gray-400 mt-2">{stns}/{need} stations • {total.toLocaleString()} votes</p>
+      <div className="bg-[#f8f9fa] rounded-xl p-3 mb-2 border border-gray-100">
+        <p className="font-medium text-[14px] text-black">{name}</p>
+        <div className="flex justify-between mt-1">
+          <p className="font-bold text-[14px]">{votes.toLocaleString()} votes</p>
+          <p className="font-bold text-[14px] text-[#0a3d1f]">{pct}%</p>
+        </div>
+        <div className="w-full h-2.5 bg-gray-200 rounded-full mt-2 overflow-hidden">
+          <div className="h-full bg-[#0a3d1f] rounded-full transition-all duration-700" style={{width:`${pct}%`}}></div>
+        </div>
+        {isWinner && <p className="text-[10px] font-black text-green-700 mt-1">🎉 LEADING</p>}
       </div>
     );
   };
 
-  const renderMP=()=>{
-    const candidates=MP_CANDIDATES[filter]||MP_CANDIDATES["Mumias East"];
-    const {tally,total,sorted,stns}=getTally("MP",filter);
-    const need=100; const isComplete=stns>=need; const win=sorted[0] as any;
+  const renderUniformRace = (race:string, title:string, candidates:string[], tally:any, total:number, stns:number, need:number) => {
+    const sorted = Object.entries(tally).sort((a:any,b:any)=>b[1]-a[1]);
+    const isComplete = stns>=need;
+    const winner = sorted[0] as any;
     return(
-      <div>
-        <p className="font-bold text-[13px] mb-3">{filter} Constituency - MP Race - Different Candidates per Sub-county</p>
-        {isComplete && win && <div className="bg-green-600 text-white rounded-2xl p-5 text-center mb-5"><h2 className="text-[24px] font-black">🎉 CONGRATULATIONS MP {win[0].split(" ")[0].toUpperCase()} - {filter.toUpperCase()}! 🎉</h2><p>{win[0]} - {win[1].toLocaleString()} votes - ELECTED MP {filter}</p></div>}
-        <div className="grid md:grid-cols-3 gap-3">{candidates.map((c:any)=>{ const key=Object.keys(tally).find(k=>k.includes(c.short))||c.name; const v=tally[key]||0; const pct=total?Math.round(v/total*100):0; const isWin=win&&win[0]===key; return(<div key={c.name} className={`bg-white rounded-xl p-4 shadow-sm ${isWin && isComplete? "bg-green-50 border-2 border-green-600":""}`}><p className="font-bold text-[13px]">{c.name} {isWin && <span className="bg-green-600 text-white text-[9px] px-2 py-0.5 rounded-full">{isComplete? "WINNER":"LEADING"}</span>}</p><p className="font-black text-[20px] mt-1">{v.toLocaleString()} <span className="text-[12px]">{pct}%</span></p></div>); })}</div>
-        <p className="text-center text-[11px] text-gray-400 mt-3">{stns}/{need} stations • {total.toLocaleString()} votes • Candidates unique to {filter}</p>
+      <div className="bg-white rounded-2xl p-4 shadow-sm border-l-4 border-l-[#0a3d1f] mb-4">
+        <p className="font-bold text-[15px]">{title} - {stns} stns reported {isComplete && winner && <span className="bg-green-600 text-white text-[10px] px-2 py-0.5 rounded-full ml-2">WINNER: {winner[0].split(" ")[0].toUpperCase()}</span>}</p>
+        {isComplete && winner && (
+          <div className="bg-green-600 text-white rounded-xl p-3 mt-3 text-center">
+            <p className="font-black text-[16px]">🎉 CONGRATULATIONS {race.toUpperCase()} {winner[0].split(" ")[0].toUpperCase()}! 🎉</p>
+            <p className="text-[12px]">{winner[0]} - {winner[1].toLocaleString()} votes ({total? ((winner[1]/total)*100).toFixed(1):0}%)</p>
+          </div>
+        )}
+        <div className="mt-3">
+          {candidates.map(c=>{
+            const key = Object.keys(tally).find(k=>k===c || k.includes(c.split(" ")[0]) || k.includes(c.split("(")[0].trim())) || c;
+            const v = tally[key]||tally[c]||0;
+            return <CandidateCard key={c} name={c} votes={v} total={total} />;
+          })}
+        </div>
+        {total===0 && <p className="text-[12px] text-gray-400 mt-2">No Form 35A/36A yet - Enter via /admin</p>}
       </div>
-    );
-  };
-
-  const renderMCA=()=>{
-    const wards=WARDS_MAP[filter]||["East Wanga","Lusheya/Lubinu","Malaha/Isongo/Makunga"];
-    return(
-      <div className="grid md:grid-cols-3 gap-4">{wards.map((w:string)=>{ const candidates=MCA_CANDIDATES[w]||MCA_CANDIDATES.default; const {tally,total,sorted,stns}=getTally("MCA",undefined,w); const need=w==="Lusheya/Lubinu"?17:16; const isComplete=stns>=need; const win=sorted[0] as any; return(<div key={w} className={`rounded-xl p-4 shadow-sm ${isComplete? "bg-green-50 border-2 border-green-600":"bg-white"}`}><p className="font-bold text-[11px]">{w} Ward - {filter} - {stns}/{need} stns • Unique MCA candidates</p>{isComplete && win? <div className="bg-green-600 text-white rounded-xl p-3 mt-3 text-center"><p className="text-[10px] font-bold">WINNER DECLARED - {w.toUpperCase()}</p><p className="font-black">🎉 CONGRATULATIONS MCA {win[0].split(" ")[0].toUpperCase()} 🎉</p><p className="text-[12px]">{win[0]} - {win[1].toLocaleString()} votes</p></div>:<div className="mt-3 space-y-2">{candidates.map((c:any)=>{ const key=Object.keys(tally).find(k=>k.includes(c.short))||c.name; const v=tally[key]||0; const pct=total?Math.round(v/total*100):0; return(<div key={c.name} className="flex justify-between text-[12px]"><span>{c.name}</span><span className="font-black">{v} ({pct}%)</span></div>); })}</div>}</div>); })}</div>
     );
   };
 
   return(
-    <div className="min-h-screen bg-[#f5f5f5]"><div className="bg-black text-white p-5"><h1 className="text-[26px] font-black">HakiTally - KAKAMEGA COUNTY</h1><p className="text-[11px] opacity-70">Full Test Mode - Different Names per Sub-county | {new Set(results.map(r=>r.station_name)).size} / 1200 Stations</p><div className="flex gap-2 mt-3 flex-wrap">{["Governor","Senator","Woman Rep","MP","MCA"].map(t=><button key={t} onClick={()=>setTab(t)} className={`px-4 py-1 rounded-full text-[12px] font-bold ${tab===t? "bg-white text-black":"bg-white/10"}`}>{t}</button>)}</div></div><div className="p-4 max-w-[1200px] mx-auto"><div className="flex gap-2 flex-wrap mb-4">{SUBCOUNTIES.map(sc=><button key={sc} onClick={()=>setFilter(sc)} className={`px-3 py-1 rounded-full text-[11px] font-bold border ${filter===sc? "bg-black text-white":"bg-white"}`}>{sc}</button>)}</div>{tab==="MP"? renderMP(): tab==="MCA"? renderMCA() : renderCountyRace(tab)}</div></div>
+    <div className="min-h-screen bg-[#f2f2f2]">
+      <div className="bg-black text-white p-4">
+        <h1 className="text-[20px] font-black">HakiTally - KAKAMEGA COUNTY</h1>
+        <div className="flex gap-2 mt-3 flex-wrap">{["Governor","Senator","Woman Rep","MP","MCA"].map(t=><button key={t} onClick={()=>{setTab(t); setWardFilter(t==="MCA"? `All Wards in ${subcounty}`:t);}} className={`px-4 py-1.5 rounded-full text-[13px] font-bold ${tab===t? "bg-white text-black":"bg-white/10 text-white/60"}`}>{t}</button>)}</div>
+      </div>
+
+      <div className="p-3 max-w-[700px] mx-auto">
+        {/* Subcounty selector */}
+        <div className="flex gap-2 flex-wrap mb-3">{SUBCOUNTIES.map(sc=><button key={sc} onClick={()=>{setSubcounty(sc); setWardFilter(`All Wards in ${sc}`);}} className={`px-3 py-1.5 rounded-full text-[12px] font-bold ${subcounty===sc? "bg-black text-white":"bg-white text-gray-700"}`}>{sc}</button>)}</div>
+
+        {/* Ward filter for MCA */}
+        {tab==="MCA" && (
+          <div className="flex gap-2 flex-wrap mb-4 bg-white p-2 rounded-xl">
+            <button onClick={()=>setWardFilter(`All Wards in ${subcounty}`)} className={`px-3 py-1.5 rounded-full text-[12px] font-bold ${wardFilter===`All Wards in ${subcounty}`? "bg-black text-white":"bg-gray-100"}`}>All Wards in {subcounty}</button>
+            {(WARDS_PER_SUBCOUNTY[subcounty]||[]).map((w:string)=><button key={w} onClick={()=>setWardFilter(w)} className={`px-3 py-1.5 rounded-full text-[12px] font-bold ${wardFilter===w? "bg-black text-white":"bg-gray-100"}`}>{w}</button>)}
+          </div>
+        )}
+
+        {/* GOVERNOR */}
+        {tab==="Governor" && (()=>{ const {tally,total,stns}=getTally("Governor"); return renderUniformRace("Governor",`Governor - Kakamega County`, CANDIDATES.Governor, tally, total, stns, 1200); })()}
+
+        {/* SENATOR */}
+        {tab==="Senator" && (()=>{ const {tally,total,stns}=getTally("Senator"); return renderUniformRace("Senator",`Senator - Kakamega County`, CANDIDATES.Senator, tally, total, stns, 1200); })()}
+
+        {/* WOMAN REP */}
+        {tab==="Woman Rep" && (()=>{ const {tally,total,stns}=getTally("Woman Rep"); return renderUniformRace("Woman Rep",`Woman Rep - Kakamega County`, CANDIDATES["Woman Rep"], tally, total, stns, 1200); })()}
+
+        {/* MP - per subcounty */}
+        {tab==="MP" && (()=>{ const {tally,total,stns}=getTally("MP",subcounty); const cands=CANDIDATES.MP[subcounty]||CANDIDATES.MP["Mumias East"]; return renderUniformRace("MP",`${subcounty} - MP Race`, cands, tally, total, stns, 100); })()}
+
+        {/* MCA - per ward - EXACTLY like your screenshot */}
+        {tab==="MCA" && (
+          <div>
+            {(wardFilter.startsWith("All Wards")? (WARDS_PER_SUBCOUNTY[subcounty]||[]) : [wardFilter]).map((w:string)=>{
+              const {tally,total,stns}=getTally("MCA",subcounty,w);
+              const cands=getMCACandidates(w);
+              return renderUniformRace("MCA",`${w} Ward - ${subcounty} - MCA Race`, cands, tally, total, stns, w==="Lusheya/Lubinu"?17:16);
+            })}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
