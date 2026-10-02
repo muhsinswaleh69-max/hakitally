@@ -1,145 +1,144 @@
 "use client";
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
-
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
-// Governor candidates from your screenshot
-const GOV_CANDIDATES = [
-  { name: "Fernandes Barasa", party: "ODM", color: "border-l-[#0a2e1f] bg-white", textColor: "text-black" },
-  { name: "Cleophas Malala", party: "DCP", color: "border-l-gray-200 bg-white", textColor: "text-black" },
-  { name: "Boni Khalwale", party: "IND", color: "border-l-yellow-400 bg-white", textColor: "text-black" },
-  { name: "Elsie Muhanda", party: "", color: "border-l-purple-300 bg-white", textColor: "text-black" },
-  // Hidden MCA aggregation (Sophia etc will auto appear if you insert with ward data)
+const SUBCOUNTIES = ["Lugari","Likuyani","Malava","Lurambi","Navakholo","Mumias West","Mumias East","Matungu","Butere","Khwisero","Shinyalu","Ikolomani"];
+
+// MCA Wards per Subcounty - with real candidates for Mumias East only
+const WARDS_DATA: any = {
+  "Lugari": ["Mautuma","Lugari","Lumakanda"],
+  "Mumias East": ["East Wanga","Lusheya/Lubinu","Malaha/Isongo/Makunga"],
+  "Mumias West": ["Mumias Central","Mumias North","Etenje","Musanda"],
+};
+
+const MUMIAS_EAST_CANDIDATES = [
+  { name: "Sophia Manyasa", party: "UDA", color: "bg-green-600" },
+  { name: "Timothy Wanzetse", party: "ODM", color: "bg-orange-500" },
+  { name: "Stanislaus Wanzetse", party: "DCP", color: "bg-purple-600" },
 ];
 
-export default function Home() {
-  const [results, setResults] = useState<any[]>([]);
-  const [stats, setStats] = useState({ totalStations: 1200, reported: 0, totalVotes: 0, leading: "BARASA" });
-  const [tally, setTally] = useState<Record<string, number>>({});
+export default function MCAPortal(){
+  const [activeTab,setActiveTab]=useState("MCA");
+  const [filter,setFilter]=useState<string|null>(null);
+  const [results,setResults]=useState<any[]>([]);
+  const [stats,setStats]=useState({reported:0,total:1200});
 
-  const fetchResults = async () => {
-    const { data } = await supabase.from("hakitally_results_34a").select("*");
-    if (!data) return;
-    setResults(data);
+  const fetchAll=async()=>{
+    const {data}=await supabase.from("hakitally_results_34a").select("*");
+    if(data){
+      setResults(data);
+      setStats({reported: new Set(data.map((d:any)=>d.station_name)).size, total:1200});
+    }
+  };
 
-    // Aggregate votes from extra_votes field
-    const agg: Record<string, number> = {};
-    data.forEach((row: any) => {
-      const ev = row.extra_votes || {};
-      Object.keys(ev).forEach((k) => {
-        agg[k] = (agg[k] || 0) + (parseInt(ev[k]) || 0);
-      });
-      // Also support direct columns if exist
-      if (row.candidate_name) agg[row.candidate_name] = (agg[row.candidate_name] || 0) + (row.votes || 0);
+  useEffect(()=>{
+    fetchAll();
+    const ch=supabase.channel("mca-live").on("postgres_changes",{event:"*",schema:"public",table:"hakitally_results_34a"},fetchAll).subscribe();
+    const iv=setInterval(fetchAll,3000);
+    return()=>{supabase.removeChannel(ch); clearInterval(iv);}
+  },[]);
+
+  const getWardTally=(wardName:string)=>{
+    const rows=results.filter(r=>r.ward===wardName);
+    const stns=rows.length;
+    const tally:Record<string,number>={};
+    rows.forEach(r=>{
+      const ev=r.extra_votes||{};
+      Object.entries(ev).forEach(([k,v]:any)=>{ tally[k]=(tally[k]||0)+(v||0); });
     });
-    setTally(agg);
-
-    const totalVotes = Object.values(agg).reduce((a: number, b: number) => a + b, 0) as number;
-    const reported = new Set(data.map((d: any) => d.station_name)).size;
-
-    // Find leading
-    let leadingName = "BARASA";
-    let max = 0;
-    Object.entries(agg).forEach(([k, v]) => {
-      if (v > max) { max = v; leadingName = k.split(" ")[0].toUpperCase(); }
-    });
-
-    setStats({ totalStations: 1200, reported, totalVotes, leading: leadingName });
+    const total=Object.values(tally).reduce((a:any,b:any)=>a+b,0) as number;
+    return {stns, tally, total};
   };
 
-  useEffect(() => {
-    fetchResults();
-    const channel = supabase.channel("hakitally").on("postgres_changes", { event: "*", schema: "public", table: "hakitally_results_34a" }, () => fetchResults()).subscribe();
-    const interval = setInterval(fetchResults, 3000);
-    return () => { supabase.removeChannel(channel); clearInterval(interval); };
-  }, []);
+  const allWards = filter? (WARDS_DATA[filter] || [filter]) : Object.entries(WARDS_DATA).flatMap(([sc,wards]:any)=>wards.map((w:string)=>({sc,w})));
 
-  const total = stats.totalVotes || 1;
-  const getVotes = (search: string) => {
-    // match Fernandes Barasa
-    const key = Object.keys(tally).find(k => k.toLowerCase().includes(search.toLowerCase()));
-    return key? tally[key] : 0;
-  };
+  return(
+    <div className="min-h-screen bg-[#f5f5f5]">
+      {/* Header - EXACT as your screenshot */}
+      <div className="bg-black text-white p-5">
+        <h1 className="text-[28px] font-black tracking-wide">HakiTally - KAKAMEGA COUNTY</h1>
+        <p className="text-[14px] opacity-70 mt-1">MCA 2027 Live Portal | All Subcounties and Wards | {stats.reported} / {stats.total} Stations - FRESH DATA MODE</p>
+        <div className="flex gap-2 mt-4 flex-wrap">
+          {["Governor","Senator","Woman Rep","MP","MCA"].map(t=>(
+            <button key={t} onClick={()=>setActiveTab(t)} className={`px-4 py-1.5 rounded-full text-[13px] font-bold ${activeTab===t? "bg-white text-black":"bg-white/10 text-white/60"}`}>{t}</button>
+          ))}
+        </div>
+      </div>
 
-  const barasa = getVotes("Barasa") || 50672;
-  const malala = getVotes("Malala") || 25731;
-  const khalwale = getVotes("Khalwale") || 10661;
-  const elsie = getVotes("Muhanda") || getVotes("Elsie") || 7123;
-
-  // If live data is empty, show demo from screenshot, else show live
-  const isLive = Object.keys(tally).length > 0;
-  const display = {
-    barasa: isLive? getVotes("Barasa") : 50672,
-    malala: isLive? getVotes("Malala") : 25731,
-    khalwale: isLive? getVotes("Khalwale") : 10661,
-    elsie: isLive? getVotes("Elsie") : 7123,
-  };
-  const sumDisplay = display.barasa + display.malala + display.khalwale + display.elsie || 1;
-
-  const constituencies = ["Lugari","Likuyani","Malava","Lurambi","Navakholo","Mumias West","Mumias East","Matungu","Butere","Khwisero","Shinyalu","Ikolomani"];
-
-  const getConstStats = (constName: string) => {
-    const rows = results.filter((r: any) => r.constituency?.toLowerCase() === constName.toLowerCase() || r.ward?.toLowerCase().includes(constName.toLowerCase()));
-    const stns = rows.length;
-    const votes = rows.reduce((s: number, r: any) => s + (r.mca_votes || Object.values(r.extra_votes||{}).reduce((a:any,b:any)=>a+b,0)), 0);
-    return { stns, votes };
-  };
-
-  return (
-    <div className="min-h-screen bg-[#f1f1f1] p-3">
-      <div className="max-w-[600px] mx-auto">
-        {/* Header - matches screenshot dark green */}
-        <div className="bg-[#0f3d26] rounded-[20px] p-6 text-white text-center shadow-lg">
-          <h1 className="text-[26px] font-black leading-tight tracking-wide">HakiTally - KAKAMEGA<br/>COUNTY</h1>
-          <p className="text-[15px] mt-2 opacity-90">Governor 2027 Live Tally | Form 34A Parallel Count</p>
-          <p className="text-[18px] font-bold mt-4">{stats.reported || 7} / {stats.totalStations} Stations Reported ({Math.round((stats.reported||7)/stats.totalStations*100)}%)</p>
-          <div className="w-full h-[10px] bg-white/20 rounded-full mt-3 overflow-hidden">
-            <div className="h-full bg-[#4ade80] rounded-full transition-all duration-1000" style={{ width: `${Math.max(1, ((stats.reported||7)/stats.totalStations)*100)}%` }}></div>
-          </div>
-          <p className="text-[13px] mt-3 opacity-80">Auto-updates instantly | Leading: {stats.leading} ● LIVE</p>
+      <div className="p-4 max-w-[1200px] mx-auto">
+        <p className="font-bold text-[13px] text-gray-600">MCA PORTAL - All 12 Subcounties - Click Any Subcounty to Filter</p>
+        <div className="flex gap-2 mt-3 flex-wrap">
+          <button onClick={()=>setFilter(null)} className={`px-3 py-1.5 rounded-full text-[12px] font-bold border ${!filter? "bg-black text-white":"bg-white"}`}>All</button>
+          {SUBCOUNTIES.map(sc=>(
+            <button key={sc} onClick={()=>setFilter(sc)} className={`px-3 py-1.5 rounded-full text-[12px] font-bold border ${filter===sc? "bg-black text-white":"bg-white text-gray-600"}`}>{sc}</button>
+          ))}
         </div>
 
-        {/* Candidate Cards - 2x2 grid as screenshot */}
-        <div className="grid grid-cols-2 gap-3 mt-4">
-          <div className="bg-white rounded-2xl p-4 shadow-sm border-l-[5px] border-l-[#0a2e1f] relative">
-            <p className="text-[15px] font-semibold">Fernandes Barasa<br/>(ODM)</p>
-            <p className="text-[26px] font-black mt-1">{display.barasa.toLocaleString()} <span className="text-[16px] font-semibold text-gray-500">{Math.round(display.barasa/sumDisplay*100)}%</span></p>
-            {display.barasa >= display.malala && display.barasa >= display.khalwale && <span className="inline-block mt-2 bg-gray-100 text-[12px] font-black px-2.5 py-1 rounded-md">LEADING</span>}
-            <div className="absolute top-4 right-3 w-7 h-7 bg-gray-100 rounded flex items-center justify-center"><div className="w-3 h-3 bg-black rounded-full"></div></div>
-          </div>
+        {/* Wards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+          {(filter? WARDS_DATA[filter]?.map((w:string)=>({sc:filter,w})) || [] : Object.entries(WARDS_DATA).flatMap(([sc,wards]:any)=>wards.map((w:string)=>({sc,w})))).map(({sc,w}:any)=>{
+            const {stns,tally,total}=getWardTally(w);
+            const isMumiasEast = ["East Wanga","Lusheya/Lubinu","Malaha/Isongo/Makunga"].includes(w);
 
-          <div className="bg-white rounded-2xl p-4 shadow-sm border-l-[5px] border-l-gray-100">
-            <p className="text-[15px] font-semibold">Cleophas Malala<br/>(DCP)</p>
-            <p className="text-[26px] font-black mt-1">{display.malala.toLocaleString()} <span className="text-[16px] font-semibold text-red-400">{Math.round(display.malala/sumDisplay*100)}%</span></p>
-          </div>
+            return(
+              <div key={w} className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-l-gray-300">
+                <p className="font-bold text-[13px]">{w} Ward - {sc} - MCA Race - {stns} stns reported {stns>0 && `• ${total} votes`}</p>
 
-          <div className="bg-white rounded-2xl p-4 shadow-sm border-l-[5px] border-l-yellow-400">
-            <p className="text-[15px] font-semibold">Boni Khalwale (IND)</p>
-            <p className="text-[26px] font-black mt-1">{display.khalwale.toLocaleString()} <span className="text-[16px] font-semibold text-gray-500">{Math.round(display.khalwale/sumDisplay*100)}%</span></p>
-          </div>
+                <div className="mt-4 space-y-3">
+                  {isMumiasEast? MUMIAS_EAST_CANDIDATES.map(c=>{
+                    const key=Object.keys(tally).find(k=>k.includes(c.name.split(" ")[0]));
+                    const votes=key? tally[key]:0;
+                    const pct=total? Math.round(votes/total*100):0;
+                    return(
+                      <div key={c.name} className="flex justify-between items-center">
+                        <div>
+                          <p className="text-[13px] font-semibold">{c.name} ({c.party})</p>
+                          <div className="w-[140px] h-1.5 bg-gray-100 rounded-full mt-1 overflow-hidden">
+                            <div className={`h-full ${c.color} transition-all`} style={{width:`${pct}%`}}></div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-black text-[14px]">{votes.toLocaleString()} votes</p>
+                          <p className="text-[11px] text-gray-500">{pct}% {votes>0 && total>0 && votes===Math.max(...Object.values(tally) as number[]) && <span className="bg-green-100 text-green-700 px-1 rounded font-bold">LEADING</span>}</p>
+                        </div>
+                      </div>
+                    );
+                  }) : ["MCA Candidate A (ODM)","MCA Candidate B (UDA)","MCA Candidate C (IND)"].map(name=>(
+                    <div key={name} className="flex justify-between">
+                      <p className="text-[13px] text-gray-600">{name}</p>
+                      <p className="text-[13px] font-bold">0 votes</p>
+                    </div>
+                  ))}
+                </div>
 
-          <div className="bg-white rounded-2xl p-4 shadow-sm border-l-[5px] border-l-purple-300">
-            <p className="text-[15px] font-semibold">Elsie Muhanda</p>
-            <p className="text-[26px] font-black mt-1">{display.elsie.toLocaleString()} <span className="text-[16px] font-semibold text-gray-500">{Math.round(display.elsie/sumDisplay*100)}%</span></p>
-          </div>
-        </div>
-
-        {/* By Constituency - Live */}
-        <div className="bg-white rounded-2xl p-4 mt-4 shadow-sm">
-          <p className="text-gray-500 text-[14px] mb-3">By Constituency - Live</p>
-          {constituencies.map((c) => {
-            const s = getConstStats(c);
-            return (
-              <div key={c} className="flex justify-between py-3 border-b last:border-0">
-                <p className="font-bold text-[16px]">{c} - <span className="font-normal">- leading</span></p>
-                <p className="text-gray-400 text-[14px]">{s.stns} stns | {s.votes} votes</p>
+                {isMumiasEast && stns>0 && <p className="text-[10px] text-green-600 font-bold mt-3">● LIVE - {stns} stations from {w}</p>}
+                {!isMumiasEast && <p className="text-[10px] text-gray-400 mt-3">Vote Flow<br/>No Form 35A yet - Enter via admin</p>}
               </div>
             );
           })}
         </div>
 
-        <div className="text-center text-[11px] text-gray-400 mt-4">HakiTally • Updates every 3 sec • Supabase Realtime • {isLive? "LIVE DATA" : "DEMO (waiting for Admin submissions)"}</div>
+        {/* Show other subcounties as empty if filter null */}
+        {!filter && (
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            {["Lugari","Likuyani","Malava","Lurambi"].map(sc=> WARDS_DATA[sc]?.slice(0,1).map((w:string)=>{
+              const {stns}=getWardTally(w);
+              return(
+                <div key={sc+"-"+w} className="bg-white rounded-xl p-4 shadow-sm border-l-4">
+                  <p className="font-bold text-[13px]">{w} Ward - {sc} - MCA Race - {stns} stns reported</p>
+                  <div className="mt-3 space-y-2 text-[13px] text-gray-500">
+                    <div className="flex justify-between"><span>MCA Candidate A (ODM)</span><span className="font-bold">0 votes</span></div>
+                    <div className="flex justify-between"><span>MCA Candidate B (UDA)</span><span className="font-bold">0 votes</span></div>
+                    <div className="flex justify-between"><span>MCA Candidate C (IND)</span><span className="font-bold">0 votes</span></div>
+                  </div>
+                </div>
+              );
+            }))}
+          </div>
+        )}
+
+        <p className="text-center text-[11px] text-gray-400 mt-8">Auto-refresh 3s • {stats.reported} stations live • Click Mumias East to see Sophia Manyasa live tally</p>
       </div>
     </div>
   );
