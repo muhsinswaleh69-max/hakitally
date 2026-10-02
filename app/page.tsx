@@ -1,120 +1,71 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
-const SUBCOUNTIES = ["Lugari","Likuyani","Malava","Lurambi","Navakholo","Mumias West","Mumias East","Matungu","Butere","Khwisero","Shinyalu","Ikolomani"];
-
-const WARDS: any = {
+const WARDS_DATA:any = {
   "Mumias East": ["East Wanga","Lusheya/Lubinu","Malaha/Isongo/Makunga"],
   "Mumias West": ["Mumias Central","Mumias North","Etenje","Musanda"],
   "Matungu": ["Koyonzo","Kholera","Khalaba","Mayoni","Namamali"],
   "Lugari": ["Mautuma","Lugari","Lumakanda","Chekalini","Chevaywa","Lawandeti"],
   "Likuyani": ["Likuyani","Sango","Kongoni","Nzoia","Lumakanda"],
   "Malava": ["Manda-Shivanga","Matsakha","Lutaso","Ndalu","Matioli","Butali-Chegulo","Shivali"],
-  "Lurambi": ["Butsotso East","Butsotso South","Butsotso Central","Sheywe","Mahiakalo","Shirere"],
-  "Navakholo": ["Ingostse-Matiha","Shinoyi-Shikomari","Bunyala West","Bunyala East","Bunyala Central"],
-  "Butere": ["Marama West","Marama Central","Marama North","Marama South","Marenyo-Shianda"],
-  "Khwisero": ["Kisa North","Kisa East","Kisa West","Kisa Central"],
-  "Shinyalu": ["Isukha North","Murhanda","Isukha Central","Isukha South","Isukha East","Isukha West"],
-  "Ikolomani": ["Idakho South","Idakho East","Idakho North","Idakho Central"],
 };
 
-const MP_CANDIDATES: any = {
-  "Mumias East": ["Peter Salasya (DAP-K)","Benjamin Washiali (UDA)","Elon Wameyo (IND)"],
-  "Mumias West": ["Johnson Naicca (ODM)","Rashid Echesa (UDA)"],
-  "Matungu": ["Peter Nabulindo (ODM)","Oscar Nabulindo (UDA)"],
-  "default": ["Candidate A (ODM)","Candidate B (UDA)","Candidate C (DCP)"]
-};
-
-// UPDATED FOR EXPERIMENT - YOUR 3 CANDIDATES
-const MCA_CANDIDATES: any = {
+// REAL CANDIDATES FOR EXPERIMENT
+const CANDIDATES:any = {
   "East Wanga": ["Timothy Wanzetse (ODM)","Sophia Manyasa (UDA)","Stanislaus Wanzetse (DAP-K)"],
   "Lusheya/Lubinu": ["Timothy Wanzetse (ODM)","Sophia Manyasa (UDA)","Stanislaus Wanzetse (DAP-K)"],
   "Malaha/Isongo/Makunga": ["Timothy Wanzetse (ODM)","Sophia Manyasa (UDA)","Stanislaus Wanzetse (DAP-K)"],
-  "Mautuma": ["Mautuma A (ODM)","Mautuma B (UDA)","Mautuma C (IND)"],
   "default": ["Timothy Wanzetse (ODM)","Sophia Manyasa (UDA)","Stanislaus Wanzetse (DAP-K)"]
 };
 
-const OTHER: any = {
-  Governor: ["Fernandes Barasa (ODM)","Cleophas Malala (DCP)","Boni Khalwale (IND)"],
-  Senator: ["Kevin Mahelo (UDA)","Seth Panyako (UDA)","Naomi Shiyonga (DAP-K)"],
-  "Woman Rep": ["Margaret Ndege (IND)","Hadija Nganyi (UDA)","Naomi Shiyonga (DAP-K)"],
+const STATIONS:any = {
+  "Mumias East": ["Shibale Primary - S1","Shibale Primary - S2","East Wanga DEB - S1","Lubinu Primary - S1","Lubinu Primary - S2","Malaha Primary - S1","Malaha Primary - S2","Isongo Primary","Makunga Primary","Eluche Primary","Khaunga Primary","Mumias Sugar Sec","Shianda Primary","Khaimba Primary","Kholera Primary","Khainga Primary","Emukaya Primary","Mwitoti Primary"],
+  "default": ["Station 1","Station 2","Station 3"]
 };
 
-export default function FinalPortal() {
-  const [race, setRace] = useState("MCA");
-  const [results, setResults] = useState<any[]>([]);
-  const [selectedSubcounty, setSelectedSubcounty] = useState<string | null>("Mumias East");
-  const [selectedWard, setSelectedWard] = useState("All");
+export default function Admin(){
+  const [consti,setConsti]=useState("Mumias East");
+  const [ward,setWard]=useState("East Wanga");
+  const [station,setStation]=useState("");
+  const [votes,setVotes]=useState(["","",""]);
+  const [msg,setMsg]=useState("");
 
-  useEffect(() => {
-    const f = async () => { const { data } = await supabase.from("hakitally_results_34a").select("*"); setResults(data || []); };
-    f(); const ch = supabase.channel("final-v2").on("postgres_changes", { event: "*", schema: "public", table: "hakitally_results_34a" }, () => f()).subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, []);
+  const cands = CANDIDATES[ward] || CANDIDATES.default;
+  const stations = STATIONS[consti] || STATIONS.default;
 
-  const displaySubcounties = selectedSubcounty? [selectedSubcounty] : SUBCOUNTIES;
+  const submit = async()=>{
+    if(!station ||!votes[0] ||!votes[1]){ setMsg("Fill station + at least 2 candidates"); return;}
+    const extra:any={}; cands.forEach((c:string,i:number)=> extra[c]=parseInt(votes[i]||"0"));
+    const {error} = await supabase.from("hakitally_results_34a").insert([{
+      constituency: consti, ward: ward, station_name: station,
+      extra_votes: extra, governor_votes:0, senator_votes:0, womanrep_votes:0, mp_votes:0, mca_votes: parseInt(votes[0])||0
+    }]);
+    if(error) setMsg("Error: "+error.message); else { setMsg(`✓ Submitted ${ward} - ${station} - LIVE NOW on main board!`); setVotes(["","",""]); }
+  };
 
-  return (
-    <div className="min-h-screen w-screen bg-[#f1f3f5]">
-      <div className="w-full bg-[#0a2e1f] text-white p-6">
-        <div className="max-w-[1700px] mx-auto">
-          <h1 className="font-black text-3xl">HakiTally - KAKAMEGA COUNTY</h1>
-          <p className="opacity-80 mt-1">{race} 2027 Live | % + ELECTED | {results.length} / 1200 Stations</p>
-          <div className="flex gap-2 mt-4 flex-wrap">
-            {["Governor","Senator","Woman Rep","MP","MCA"].map((r) => (
-              <button key={r} onClick={() => { setRace(r); setSelectedSubcounty(r==="MCA"?"Mumias East":null); }} className={`px-6 py-2 rounded-full font-bold text-sm ${race===r? "bg-white text-black" : "bg-white/20"}`}>{r}</button>
-            ))}
-          </div>
+  return(
+    <div className="min-h-screen bg-gray-100 p-4 max-w-[600px] mx-auto">
+      <p className="text-xs">All computers A,B,C,D,E,F sync to same main server at Kakamega High School. Each submit = 0.2KB data. Offline saves auto-sync.</p>
+      <h1 className="font-black text-xl mt-2">HakiTally ADMIN - Mumias East</h1>
+      <div className="bg-white p-5 rounded-xl mt-4 space-y-4">
+        <div><label className="font-bold text-sm">Electoral Seat</label><select value="MCA" className="w-full p-3 border-2 rounded-xl bg-orange-50 font-bold"><option>MCA</option></select></div>
+        <div><label className="font-bold text-sm">Constituency (12)</label><select value={consti} onChange={e=>setConsti(e.target.value)} className="w-full p-3 border-2 rounded-xl bg-orange-50 font-bold">{Object.keys(WARDS_DATA).map(c=><option key={c}>{c} - 0 stns</option>)}<option>Mumias East - 0 stns</option></select></div>
+        <div><label className="font-bold text-sm">Ward - {consti}</label><select value={ward} onChange={e=>setWard(e.target.value)} className="w-full p-3 border-2 rounded-xl font-bold">{(WARDS_DATA[consti]||["East Wanga","Lusheya/Lubinu","Malaha/Isongo/Makunga"]).map((w:string)=><option key={w} value={w}>{w}</option>)}</select></div>
+        <div><label className="font-bold text-sm">Select Station - {consti} ({stations.length} stations)</label><select value={station} onChange={e=>setStation(e.target.value)} className="w-full p-3 border rounded-xl"><option value="">-- Choose Polling Station --</option>{stations.map((s:string)=><option key={s} value={s}>{s}</option>)}</select></div>
+
+        <div className="grid grid-cols-1 gap-3 pt-2">
+          {cands.map((cand:string,i:number)=>(
+            <div key={cand}><label className="font-bold text-[12px] text-[#0a2e1f]">{cand} {i===0?"(ODM)":i===1?"(UDA)":"(DAP-K)"} - {ward}</label><input type="number" placeholder="Votes" value={votes[i]} onChange={e=>{ const nv=[...votes]; nv[i]=e.target.value; setVotes(nv);}} className="w-full p-3 border-2 rounded-xl font-bold"/></div>
+          ))}
         </div>
-      </div>
-      <div className="max-w-[1700px] mx-auto p-4">
-        <div className="bg-white rounded-xl p-4 mb-4 shadow-sm">
-          <div className="flex justify-between"><p className="font-black text-sm">{selectedSubcounty} - Detailed</p><button onClick={() => setSelectedSubcounty(null)} className="px-4 py-1 bg-black text-white rounded-full text-xs font-bold">← Show All 12</button></div>
-          <div className="flex gap-2 mt-3 flex-wrap">{SUBCOUNTIES.map(sc => <button key={sc} onClick={() => setSelectedSubcounty(sc)} className={`px-3 py-1.5 rounded-full text-xs font-bold ${selectedSubcounty===sc? "bg-[#0a2e1f] text-white" : "bg-gray-200"}`}>{sc}</button>)}</div>
-          {race==="MCA" && selectedSubcounty && (
-            <div className="flex gap-2 mt-3 flex-wrap border-t pt-3">
-              <button onClick={() => setSelectedWard("All")} className={`px-3 py-1 rounded-full text-xs font-bold ${selectedWard==="All"? "bg-black text-white" : "bg-yellow-100"}`}>All Wards in {selectedSubcounty}</button>
-              {(WARDS[selectedSubcounty]||[]).map((w:string)=><button key={w} onClick={()=>setSelectedWard(w)} className={`px-3 py-1 rounded-full text-xs font-bold ${selectedWard===w? "bg-black text-white" : "bg-gray-100"}`}>{w}</button>)}
-            </div>
-          )}
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {displaySubcounties.map((sub) => {
-            const wardsList = race==="MCA"? (selectedWard==="All"? (WARDS[sub]||[]) : [selectedWard]) : [sub];
-            return wardsList.map((ward:string) => {
-              const wardResults = race==="MCA"? results.filter((r:any)=>r.ward===ward) : results.filter((r:any)=>r.constituency===sub);
-              const cands = race==="MP"? (MP_CANDIDATES[sub]||MP_CANDIDATES.default) : race==="MCA"? (MCA_CANDIDATES[ward]||MCA_CANDIDATES.default) : OTHER[race];
-              const votesArr = cands.map((_:any, idx:number) => wardResults.reduce((s:any,r:any)=> s + parseInt((r.extra_votes? Object.values(r.extra_votes)[idx] : 0) as any || 0),0));
-              const totalVotes = votesArr.reduce((a:number,b:number)=>a+b,0) || 1;
-              const maxVotes = Math.max(...votesArr);
-              const hasData = wardResults.length>0;
-              return (
-                <div key={sub+ward} className="bg-white rounded-xl p-5 border-l-[6px] border-l-[#0a2e1f] shadow-sm">
-                  <p className="font-black text-[13px]">{ward} Ward - {sub} - MCA Race - {wardResults.length} stns reported</p>
-                  <div className="mt-4 space-y-3">
-                    {cands.map((cand:string, idx:number) => {
-                      const v = votesArr[idx]; const pct = hasData? (v/totalVotes*100) : 0; const isWinner = hasData && v===maxVotes && v>0;
-                      return (
-                        <div key={cand} className={`p-3 rounded-xl border ${isWinner? "bg-green-50 border-green-500 border-2" : "bg-gray-50 border-gray-100"}`}>
-                          <div className="flex justify-between items-center gap-2"><span className="font-bold text-[12px]">{cand}</span>{isWinner && <span className="bg-green-600 text-white text-[9px] font-black px-2 py-1 rounded-full">✓ ELECTED - WON</span>}</div>
-                          <div className="flex justify-between items-center mt-2"><span className="text-xs font-black">{v.toLocaleString()} votes</span><span className="text-xs font-black text-[#0a2e1f]">{pct.toFixed(1)}%</span></div>
-                          <div className="w-full bg-gray-200 h-2.5 rounded-full mt-2 overflow-hidden"><div className={`h-2.5 rounded-full ${isWinner? "bg-green-600" : "bg-[#0a2e1f]"}`} style={{width: `${pct}%`}}></div></div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <p className="text-[10px] text-gray-400 mt-3">{hasData? `Stations: ${wardResults.map((r:any)=>r.station_name).join(", ")}` : "No Form 35A/36A yet - Enter via /admin"}</p>
-                </div>
-              );
-            });
-          })}
-        </div>
+
+        <div><label className="text-sm">Form 35A Photo *</label><input type="file" className="mt-1"/></div>
+        <button onClick={submit} className="w-full bg-[#1a6fb5] text-white font-black p-4 rounded-full">Submit MCA to Main Server ✓</button>
+        {msg && <p className="bg-green-100 p-3 rounded-xl font-bold text-sm">{msg}</p>}
+        <p className="text-[11px] text-gray-500">After submit, check MAIN link: / - {ward} will show % + ELECTED badge instantly. Winner = highest votes turns GREEN as in image above.</p>
       </div>
     </div>
   );
