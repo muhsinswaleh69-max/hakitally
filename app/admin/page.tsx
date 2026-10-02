@@ -102,16 +102,20 @@ export default function Admin(){
     const {data}=await supabase.from('results').select('constituency,ward,station_name')
     if(data){
       const set = new Set(data.map((r:any)=> `${r.constituency}|${r.ward}|${r.station_name}`))
-      setLockedStations(set)
+      setLockedStations(set as any)
     }
   }
 
   useEffect(()=>{
     refreshLocks()
-    const channel = supabase.channel('lock-watcher').on('postgres_changes',{event:'INSERT',schema:'public',table:'results'},(payload)=>{
+    const channel = supabase.channel('lock-watcher').on('postgres_changes',{event:'INSERT',schema:'public',table:'results'},(payload:any)=>{
       const r:any = payload.new
       const key = `${r.constituency}|${r.ward}|${r.station_name}`
-      setLockedStations(prev=> new Set([...prev, key]))
+      setLockedStations(prev=>{
+        const next = new Set(prev)
+        next.add(key)
+        return next as any
+      })
     }).subscribe()
     return ()=>{ supabase.removeChannel(channel) }
   },[])
@@ -123,17 +127,22 @@ export default function Admin(){
     setLoading(true)
     const payload = { constituency, ward, station_name: station, barasa_votes: votes.barasa, malala_votes: votes.malala, khalwale_votes: votes.khalwale, muhanda_votes: votes.muhanda, total_votes: votes.barasa+votes.malala+votes.khalwale+votes.muhanda }
     try{
-      const {error}=await supabase.from('results').insert([payload]); if(error) throw error
-      setLockedStations(prev=> new Set([...prev, key])); alert(`✅ Locked! ${station} sent and locked.`)
+      const {error}:any=await supabase.from('results').insert([payload]); if(error) throw error
+      setLockedStations(prev=>{
+        const next = new Set(prev)
+        next.add(key)
+        return next as any
+      })
+      alert(`✅ Locked! ${station} sent and locked.`)
     }catch(err:any){
-      if(err.code==='23505'){ alert(`🔒 Already locked by another clerk!`); setLockedStations(prev=> new Set([...prev, key])) }
+      if(err.code==='23505'){ alert(`🔒 Already locked by another clerk!`); setLockedStations(prev=>{ const next=new Set(prev); next.add(key); return next as any })}
       else alert(`Error: ${err.message}`)
     }
     setLoading(false); setStation(''); setVotes({barasa:0,malala:0,khalwale:0,muhanda:0})
   }
 
   const wards = constituency? Object.keys(COUNTY_DATA[constituency]||{}) : []
-  const stations = constituency && ward? COUNTY_DATA[constituency][ward]||[] : []
+  const stations = constituency && ward? (COUNTY_DATA[constituency][ward]||[]) : []
 
   return (
     <div style={{maxWidth:'560px',margin:'10px auto',padding:'16px',background:'white',borderRadius:'14px',fontFamily:'sans-serif'}}>
@@ -141,7 +150,7 @@ export default function Admin(){
       <h1 style={{fontWeight:'bold'}}>CLERK ENTRY - {constituency}</h1>
       <p style={{fontSize:'11px',color:'#666'}}>Once sent, station locks across ALL computers</p>
       <form onSubmit={submit} style={{display:'flex',flexDirection:'column',gap:'10px',marginTop:'12px'}}>
-        <select required value={constituency} onChange={e=>{setConstituency(e.target.value); setWard(''); setStation('')}} style={{padding:'14px',border:'2px solid #0a4a2a',borderRadius:'8px'}}>{Object.keys(COUNTY_DATA).map(c=><option key={c} value={c}>{c} - {Object.keys(COUNTY_DATA[c]).length} Wards</option>)}</select>
+        <select required value={constituency} onChange={e=>{setConstituency(e.target.value); setWard(''); setStation('')}} style={{padding:'14px',border:'2px solid #0a4a2a',borderRadius:'8px'}}>{Object.keys(COUNTY_DATA).map(c=><option key={c} value={c}>{c}</option>)}</select>
         <select required value={ward} onChange={e=>{setWard(e.target.value); setStation('')}} style={{padding:'14px',border:'1px solid #ccc',borderRadius:'8px'}}><option value="">-- Select Ward --</option>{wards.map((w:any)=><option key={w} value={w}>{w}</option>)}</select>
         <select required value={station} onChange={e=>setStation(e.target.value)} style={{padding:'14px',border:'1px solid #ccc',borderRadius:'8px'}}><option value="">-- Select Station --</option>{stations.map((s:any)=>{ const locked = lockedStations.has(`${constituency}|${ward}|${s}`); return <option key={s} value={s} disabled={locked}>{locked? `🔒 ${s} - ALREADY SENT` : `📍 ${s}`}</option>})}</select>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
@@ -152,7 +161,7 @@ export default function Admin(){
         </div>
         <button disabled={loading} style={{padding:'16px',background:'#0a4a2a',color:'white',borderRadius:'10px',fontWeight:'bold'}}>{loading?'Submitting...':'Submit & Lock Station ✓'}</button>
       </form>
-      <div style={{marginTop:'10px',fontSize:'10px',color:'#999',textAlign:'center'}}>Build: v12-lock-fix - All 12 sub-counties</div>
+      <div style={{marginTop:'10px',fontSize:'10px',color:'#999',textAlign:'center'}}>Build: v12-lock-fix-final</div>
     </div>
   )
 }
