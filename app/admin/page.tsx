@@ -7,7 +7,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// Mumias East Stations - Lusheya/Lubinu + East Wanga
 const STATIONS_LIST = [
   { name: "Bumwende Primary", ward: "Lusheya/Lubinu" },
   { name: "Emakale Primary", ward: "Lusheya/Lubinu" },
@@ -15,7 +14,6 @@ const STATIONS_LIST = [
   { name: "Lubinu Primary School", ward: "Lusheya/Lubinu" },
   { name: "Lusheya Primary", ward: "Lusheya/Lubinu" },
   { name: "Lubinu Sec School", ward: "Lusheya/Lubinu" },
-  // Add your remaining 39 stations here...
 ];
 
 export default function AdminPage() {
@@ -35,17 +33,18 @@ export default function AdminPage() {
   useEffect(() => {
     fetchResults();
     const channel = supabase
-     .channel("admin-live")
-     .on("postgres_changes", { event: "*", schema: "public", table: "hakitally_results_34a" }, () => {
-        fetchResults(); // updates when other computer adds
+    .channel("admin-live")
+    .on("postgres_changes", { event: "*", schema: "public", table: "hakitally_results_34a" }, () => {
+        fetchResults();
       })
-     .subscribe();
+    .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  const lockedStations = results.map(r => r.station_name);
+  const lockedStations = results.map((r:any) => r.station_name);
   const filteredStations = STATIONS_LIST.filter(s => s.ward === ward);
-  const isLocked = station && lockedStations.includes(station);
+  // FIXED LINE - now always boolean
+  const isLocked: boolean = station? lockedStations.includes(station) : false;
 
   const handleSubmit = async (e: any) => {
     e.preventDefault();
@@ -54,13 +53,11 @@ export default function AdminPage() {
 
     setUploading(true);
     try {
-      // 1. Upload Form 34A
       const fileName = `${Date.now()}_${station.replace(/\s/g,"_")}.jpg`;
       const { error: upErr } = await supabase.storage.from("form34a").upload(fileName, formFile);
       if (upErr) throw upErr;
       const { data: urlData } = supabase.storage.from("form34a").getPublicUrl(fileName);
 
-      // 2. Save result
       const { error } = await supabase.from("hakitally_results_34a").insert({
         station_name: station,
         ward: ward,
@@ -84,7 +81,7 @@ export default function AdminPage() {
     <div className="min-h-screen bg-gray-100 p-4">
       <div className="max-w-xl mx-auto bg-white rounded-xl shadow p-5">
         <h1 className="font-bold text-lg">HakiTally Admin - Mumias East</h1>
-        <p className="text-sm">Live Tally | Locked: {results.length} | Ward: {ward} ({filteredStations.filter(s=>lockedStations.includes(s.name)).length}/{filteredStations.length}) <span className="text-green-600">● LIVE</span></p>
+        <p className="text-sm">Live Tally | Locked: {results.length} <span className="text-green-600">● LIVE</span></p>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-3">
           <select value={ward} onChange={e=>setWard(e.target.value)} className="w-full border p-2 rounded">
@@ -101,8 +98,6 @@ export default function AdminPage() {
             ))}
           </select>
 
-          {isLocked && <p className="text-red-600 text-sm">This station is already locked - cannot edit</p>}
-
           <input type="number" placeholder="Barasa Votes" value={barasa} onChange={e=>setBarasa(e.target.value)} className="w-full border p-2 rounded" required />
           <input type="number" placeholder="Malala Votes" value={malala} onChange={e=>setMalala(e.target.value)} className="w-full border p-2 rounded" required />
 
@@ -115,8 +110,6 @@ export default function AdminPage() {
             {uploading? "Uploading..." : "Lock & Upload to Live Server"}
           </button>
         </form>
-
-        <p className="text-xs text-center mt-3 text-gray-500">When you submit, all other computers & main board update instantly without refresh</p>
       </div>
     </div>
   );
