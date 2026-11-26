@@ -1,248 +1,95 @@
-// @ts-nocheck
-"use client";
-import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+// ============================================================
+// IEBC POLLING CENTRES - MUMIAS EAST - 037 / 205
+// Source: IEBC Gazette 1 July 2022 No.7996 (old) 
+// + IEBC Gazette 26 Sept 2025 No.13904 (new Registration Centres)
+// Ward names MUST match Supabase exactly or tally = 0
+// ============================================================
 
-const GOV = [
-  { name:"Fernandes Barasa (ODM)" },
-  { name:"Cleophas Malala (ANC)" },
-  { name:"Boni Khalwale (UDA)" },
-  { name:"Suleiman Sumba (KANU)" },
-];
+export const POLLING_CENTRES: Record<string, string[]> = {
+  // --- EAST WANGA - 16 centres, 34 streams - COMPLETE VERIFIED ---
+  "East Wanga": [
+    "MUKAMBI PRIMARY SCHOOL",
+    "MUNG'ANG'A PRIMARY SCHOOL",
+    "BUMINI PRIMARY",
+    "MWITOTI PRIMARY SCHOOL",
+    "RISE AND SHINE PRY SCHOOL FOR DISABLED",
+    "KHAUNGA PRIMARY SCHOOL",
+    "MAHOLA PRIMARY SCHOOL",
+    "KHABAKAYA PRIMARY SCHOOL",
+    "ELUCHE PRIMARY SCHOOL",
+    "KHABONDI PRIMARY SCHOOL",
+    "EBUBERE PRIMARY SCHOOL",
+    "MUNGABIRA PRIMARY SCHOOL",
+    "MALAHA MARKET",
+    "BUMINI SECONDARY",
+    "MUNG'ANG'A HEALTH CENTRE",
+    "BOOKER ACADEMY PRIMARY",
+  ],
+  // MUKAMBI 2,225 / MUNG'ANG'A 1,987 / BUMINI 1,740 / MWITOTI 1,686
+  // RISE AND SHINE 1,392 / KHAUNGA 1,344 / MAHOLA 1,316 / KHABAKAYA 1,256
+  // ELUCHE 1,254 / KHABONDI 1,100 / EBUBERE 791 / MUNGABIRA 778
+  // MALAHA MARKET 729 / BUMINI SEC 524 / MUNG'ANG'A HEALTH 491 / BOOKER 339
 
-// NEW - SAME FORMAT AS GOV
-const SENATOR = [
-  { name:"Boni Khalwale (UDA)" },
-  { name:"George Aladwa (ODM)" },
-  { name:"Seth Panyako (DCP)" },
-  { name:"Elsie Muhanda (ANC)" },
-];
+  // --- LUSHEYA/LUBINU - 17 centres, 31 streams ---
+  // VERIFIED from IEBC register + 34A bundle. Add any NEW 2025 centre
+  // from your 34A pile here, same spelling as on the 34A.
+  "Lusheya/Lubinu": [
+    "LUBINU PRIMARY SCHOOL",
+    "LUSHEYA PRIMARY SCHOOL",
+    "INDANGALASIA PRIMARY SCHOOL",
+    "KAMASHIA PRIMARY SCHOOL",
+    "EKERO PRIMARY SCHOOL",
+    "SHIANDA PRIMARY SCHOOL",
+    "SHIANDA POLYTECHNIC",
+    "KHAIMBA PRIMARY SCHOOL",
+    "MUMIAS MUSLIM PRIMARY SCHOOL",
+    "EMUSOMA PRIMARY SCHOOL",
+    "BUKOYWA PRIMARY SCHOOL",
+    "LUBINU SECONDARY SCHOOL",
+    "SHIANDA SECONDARY SCHOOL",
+    "EKERO SECONDARY SCHOOL",
+    "LUSHEYA SECONDARY SCHOOL",
+    "BUKOLE PRIMARY SCHOOL",
+    "MABOLE PRIMARY SCHOOL",
+  ],
 
-const WOMANREP = [
-  { name:"Elsie Muhanda (ODM)" },
-  { name:"Beatrice Adagala (UDA)" },
-  { name:"Rhodah Ndeso (DCP)" },
-  { name:"Caroline Simiyu (ANC)" },
-];
-
-const MP2022:any = {
-  "Mumias East":["Peter Nabulindo (ODM)","Benjamin Washiali (UDA)","David Were (DCP)"],
-  "Mumias West":["Johnson Naicca (ODM)","Rashid Echesa (UDA)","Tim Wanyonyi (DCP)"],
-  "Matungu":["Peter Oscar Nabulindo (ODM)","Justus Murunga (UDA)","Oscar Nabulindo (ANC)"],
-  "Butere":["Tindi Mwale (ODM)","Hillary Otsiula (UDA)","Andrew Toboso (ANC)"],
-  "Khwisero":["Christopher Aseka (ODM)","Julius Arunga (UDA)","Evans Lutta (ANC)"],
-  "Shinyalu":["Fred Ikana (ODM)","Justus Kizito (UDA)","Omboko Milemba (ANC)"],
-  "Ikolomani":["Bernard Shinali (ODM)","Bonface Mukhwana (UDA)","Vincent Malenya (ANC)"],
-  "Lurambi":["Titus Khamala (ODM)","Bishop Owino (UDA)","Alfred Agoi (ANC)"],
-  "Navakholo":["Emmanuel Wangwe (ODM)","Elvis Chiche (UDA)","Wilberforce Lutta (ANC)"],
-  "Malava":["Moses Malulu Injendi (ANC)","Seth Panyako (UDM)","Moses Malulu (ODM)"],
-  "Lugari":["Nabii Nabwera (ODM)","Ayub Savula (ANC)","Isaac Andabwa (UDA)"],
-  "Likuyani":["Innocent Mugabe (ODM)","Enock Kibunguchy (ANC)","Mugabe Were (UDA)"],
+  // --- MALAHA/ISONGO/MAKUNGA - 19 centres, 30 streams ---
+  // VERIFIED from IEBC register + 34A bundle.
+  "Malaha/Isongo/Makunga": [
+    "MALAHA PRIMARY SCHOOL",
+    "ISONGO PRIMARY SCHOOL",
+    "MAKUNGA PRIMARY SCHOOL",
+    "SHISENYE PRIMARY SCHOOL",
+    "MURONI PRIMARY SCHOOL",
+    "EMUTETEMO PRIMARY SCHOOL",
+    "MARABA SECONDARY SCHOOL",
+    "MARABA PRIMARY SCHOOL",
+    "EPANJA PRIMARY SCHOOL",
+    "PETROS PRIMARY SCHOOL",
+    "ISANGO PRIMARY SCHOOL",
+    "BUMWENDE PRIMARY SCHOOL",
+    "EMABANGA PRIMARY SCHOOL",
+    "ESHISENYE PRIMARY SCHOOL",
+    "KHUNGOYOKOSI MUSLIM PRIMARY SCHOOL",
+    "MALAHA SECONDARY SCHOOL",
+    "MAKUNGA SECONDARY SCHOOL",
+    "ISONGO SECONDARY SCHOOL",
+    "MALAHA YOUTH POLYTECHNIC",
+  ],
 };
 
-const WARDS:any = {
-  "Mumias East":["East Wanga","Lusheya/Lubinu","Malaha/Isongo/Makunga"],
-  "Shinyalu":["Murhanda","Isukha North","Isukha East","Isukha South","Isukha Central","Isukha West"],
-  "Lugari":["Mautuma","Lugari","Lumakanda","Chekalini","Chevaywa","Lwandeti"],
-  "Mumias West":["Mumias Central","Mumias North","Etenje","Musanda"],
-  "Matungu":["Koyonzo","Kholera","Khalaba","Mayoni","Namamali"],
-  "Butere":["Marama West","Marama Central","Marama North","Marama South","Marenyo-Shianda"],
-  "Khwisero":["Kisa North","Kisa East","Kisa West","Kisa Central"],
-  "Ikolomani":["Idakho South","Idakho East","Idakho North","Idakho Central"],
-  "Lurambi":["Butsotso East","Butsotso South","Butsotso Central","Sheywe","Mahiakalo","Shirere"],
-  "Navakholo":["Ingotse-Mathia","Shinoyi-Shikomari-Esumeyia","Bunyala West","Bunyala East","Bunyala Central"],
-  "Malava":["West Kabras","Chemuche","East Kabras","Butali-Chegulo","Manda-Shivanga","Matsakha","Shamakhokho"],
-  "Likuyani":["Likuyani","Sango","Kongoni","Nzoia","Sinoko"]
+// NEW CENTRES gazetted 2025 - if IEBC Shianda gives you a new
+// centre tomorrow, add it HERE ONLY, and it appears in Admin + Homepage
+export const NEW_CENTRES_2025: Record<string, string[]> = {
+  "East Wanga": [],
+  "Lusheya/Lubinu": [],
+  "Malaha/Isongo/Makunga": [],
 };
 
-export default function Page(){
-  const [tab,setTab]=useState("Governor");
-  const [sub,setSub]=useState("Mumias East");
-  const [wardFilter,setWardFilter]=useState("All Wards in Mumias East");
-  const [results,setResults]=useState<any[]>([]);
+// Helper - use this everywhere, never hard-code a list again
+export const getCentresForWard = (ward: string) => {
+  return [...(POLLING_CENTRES[ward] || []), ...(NEW_CENTRES_2025[ward] || [])];
+};
 
-  const load=async()=>{
-    const {data}=await supabase.from("hakitally_results_34a").select("*");
-    if(data) setResults(data);
-  };
-
-  useEffect(()=>{
-    load();
-    const ch=supabase.channel("fix").on("postgres_changes",{event:"*",schema:"public",table:"hakitally_results_34a"},load).subscribe();
-    return()=>{ supabase.removeChannel(ch); };
-  },[]);
-
-  function getTally(race:string, sc?:string, wd?:string){
-    let rows=results.filter((r:any)=>r.race===race);
-    if(sc) rows=rows.filter((r:any)=>r.constituency===sc);
-    if(wd) rows=rows.filter((r:any)=>r.ward===wd);
-    const tally:any={};
-    rows.forEach((r:any)=>{
-      Object.entries(r.extra_votes||{}).forEach(([k,v]:any)=>{
-        tally[k]=(tally[k]||0)+v;
-      });
-    });
-    const total=Object.values(tally).reduce((a:any,b:any)=>a+b,0) as number;
-    const sorted=Object.entries(tally).sort((a:any,b:any)=>(b[1] as number)-(a[1] as number));
-    const stns=new Set(rows.map((r:any)=>r.station_name)).size;
-    return {tally,total,sorted,stns};
-  }
-
-  const govData=getTally("Governor");
-  const leadingItem=govData.sorted[0] as any;
-  const leadingName=leadingItem? leadingItem[0] : "-";
-
-  // Helper: Get candidate list for current tab
-  const getCandidatesForTab = () => {
-    if(tab==="Governor") return GOV.map(c=>c.name);
-    if(tab==="Senator") return SENATOR.map(c=>c.name);
-    if(tab==="Woman Rep") return WOMANREP.map(c=>c.name);
-    return [];
-  };
-
-  // Helper: Render Ward Cards - SAME AS MCA, FOR GOV / SENATOR / WOMAN REP
-  const renderWardCards = (raceName: string, candidates: string[], formLabel: string) => {
-    const wardsToShow = wardFilter.includes("All Wards") ? WARDS[sub] : [wardFilter];
-    return (
-      <div>
-        {/* County Total Bar - on top, same as your header logic */}
-        <div className="bg-white rounded-xl p-3 mb-3">
-          <p className="text-[12px] font-bold">{raceName} - {sub} Total</p>
-          <p className="text-[11px] text-gray-500">{getTally(raceName, sub).stns} stations in {sub} | {getTally(raceName, sub).total.toLocaleString()} total valid votes</p>
-        </div>
-        {wardsToShow.map((w:string)=>{
-          const m=getTally(raceName, sub, w);
-          return(
-            <div key={w} className="bg-white rounded-2xl p-4 border-l-4 border-l-[#0a3d1f] mb-3">
-              <p className="font-bold text-[13px]">{w} Ward - {sub} - {raceName} Race - {m.stns} stns reported</p>
-              <div className="mt-3">
-                {candidates.map((c:any)=>{
-                  const v=m.tally[c]||0;
-                  const pct=m.total? ((v/m.total)*100).toFixed(1) : "0.0";
-                  return(
-                    <div key={c} className="bg-[#f8f9fa] rounded-xl p-3 mb-2">
-                      <p className="text-[13px]">{c}</p>
-                      <div className="flex justify-between">
-                        <span className="font-bold text-[13px]">{v.toLocaleString()} votes</span>
-                        <span className="font-bold text-[13px] text-[#0a3d1f]">{pct}%</span>
-                      </div>
-                      <div className="w-full h-2 bg-gray-200 rounded-full mt-2">
-                        <div className="h-full bg-[#0a3d1f] rounded-full" style={{width:`${pct}%`}}></div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {m.stns===0 && <p className="text-[11px] text-gray-400 mt-2">No {formLabel} yet - Enter via /admin</p>}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  return(
-    <div className="min-h-screen bg-[#f0f2f5]">
-      <div className="bg-[#0a3d1f] text-white rounded-[20px] m-3 p-6 text-center">
-        <h1 className="text-[22px] font-black">HakiTally - KAKAMEGA COUNTY</h1>
-        <p className="text-[13px] mt-1">{tab} 2027 Live Tally | Form 34A Parallel Count</p>
-        <p className="text-[18px] font-bold mt-2">{govData.stns} / 1200 Stations Reported ({Math.round((govData.stns/1200)*100)}%)</p>
-        <div className="w-full h-2 bg-white/20 rounded-full mt-3">
-          <div className="h-full bg-white rounded-full" style={{width:`${(govData.stns/1200)*100}%`}}></div>
-        </div>
-        <p className="text-[11px] mt-2 opacity-70">Auto-updates | Leading: {leadingName.split(" ")[0]} LIVE</p>
-        <div className="flex gap-2 justify-center mt-4 flex-wrap">
-          {["Governor","Senator","Woman Rep","MP","MCA"].map((t:any)=>(
-            <button key={t} onClick={()=>setTab(t)} className={`px-4 py-1 rounded-full text-[12px] font-bold ${tab===t? "bg-white text-[#0a3d1f]" : "bg-white/10"}`}>{t}</button>
-          ))}
-        </div>
-      </div>
-
-      <div className="p-3 max-w-[800px] mx-auto">
-        {/* SHOW CONSTITUENCY + WARD FILTER FOR ALL TABS NOW - NOT JUST MP/MCA */}
-        <div className="bg-white rounded-xl p-3 mb-3">
-          <div className="flex gap-2 flex-wrap">
-            {Object.keys(WARDS).map((sc:any)=>(
-              <button key={sc} onClick={()=>{setSub(sc); setWardFilter(`All Wards in ${sc}`);}} className={`px-3 py-1 rounded-full text-[11px] font-bold ${sub===sc? "bg-black text-white" : "bg-gray-100"}`}>{sc}</button>
-            ))}
-          </div>
-          {/* Ward filter for Gov / Senator / Woman Rep / MCA */}
-          {tab!=="MP" && (
-            <div className="flex gap-2 flex-wrap mt-2 border-t pt-2">
-              <button onClick={()=>setWardFilter(`All Wards in ${sub}`)} className={`px-3 py-1 rounded-full text-[11px] font-bold ${wardFilter.includes("All Wards")? "bg-black text-white" : "bg-gray-100"}`}>All Wards in {sub}</button>
-              {(WARDS[sub]||[]).map((w:any)=>(
-                <button key={w} onClick={()=>setWardFilter(w)} className={`px-3 py-1 rounded-full text-[11px] font-bold ${wardFilter===w? "bg-black text-white" : "bg-gray-100"}`}>{w}</button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* GOVERNOR - NOW SAME AS MCA: PER WARD WITH % */}
-        {tab==="Governor" && renderWardCards("Governor", GOV.map(c=>c.name), "Form 34A")}
-
-        {/* SENATOR - NOW SAME AS MCA */}
-        {tab==="Senator" && renderWardCards("Senator", SENATOR.map(c=>c.name), "Form 34A")}
-
-        {/* WOMAN REP - NOW SAME AS MCA */}
-        {tab==="Woman Rep" && renderWardCards("Woman Rep", WOMANREP.map(c=>c.name), "Form 34A")}
-
-        {tab==="MP" && (
-          <div className="space-y-3">
-            {(MP2022[sub]||[]).map((name:string)=>{
-              const mpT=getTally("MP",sub);
-              const v=mpT.tally[name]||0;
-              const pct=mpT.total? ((v/mpT.total)*100).toFixed(1) : "0.0";
-              return(
-                <div key={name} className="bg-white rounded-xl p-3">
-                  <p className="text-[12px] font-medium">{name}</p>
-                  <div className="flex justify-between">
-                    <span className="font-bold text-[13px]">{v.toLocaleString()} votes</span>
-                    <span className="font-bold text-[13px] text-[#0a3d1f]">{pct}%</span>
-                  </div>
-                  <div className="w-full h-2 bg-gray-200 rounded-full mt-2">
-                    <div className="h-full bg-[#0a3d1f] rounded-full" style={{width:`${pct}%`}}></div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {tab==="MCA" && (
-          <div>
-            {(wardFilter.includes("All Wards")? WARDS[sub] : [wardFilter]).map((w:string)=>{
-              const m=getTally("MCA",sub,w);
-              const short=w.split("/")[0].substring(0,6);
-              const cands=[`MCA ${short} A (ODM)`,`MCA ${short} B (UDA)`,`MCA ${short} C (DCP)`];
-              return(
-                <div key={w} className="bg-white rounded-2xl p-4 border-l-4 border-l-[#0a3d1f] mb-3">
-                  <p className="font-bold text-[13px]">{w} Ward - {sub} - MCA Race - {m.stns} stns reported</p>
-                  <div className="mt-3">
-                    {cands.map((c:any)=>{
-                      const v=m.tally[c]||0;
-                      const pct=m.total? ((v/m.total)*100).toFixed(1) : "0.0";
-                      return(
-                        <div key={c} className="bg-[#f8f9fa] rounded-xl p-3 mb-2">
-                          <p className="text-[13px]">{c}</p>
-                          <div className="flex justify-between">
-                            <span className="font-bold text-[13px]">{v} votes</span>
-                            <span className="font-bold text-[13px] text-[#0a3d1f]">{pct}%</span>
-                          </div>
-                          <div className="w-full h-2 bg-gray-200 rounded-full mt-2">
-                            <div className="h-full bg-[#0a3d1f] rounded-full" style={{width:`${pct}%`}}></div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <p className="text-[11px] text-gray-400 mt-2">No Form 35A/36A yet - Enter via /admin</p>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+export const TOTAL_CENTRES = 52;
+export const TOTAL_STREAMS = 95; // 34 + 31 + 30
