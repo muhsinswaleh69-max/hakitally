@@ -7,7 +7,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// POLLING CENTRES - Mumias East only, const only, NO export in page file
+// POLLING CENTRES - Mumias East only - const only, NO export
 const POLLING_CENTRES: Record<string, string[]> = {
   "East Wanga": [
     "MUKAMBI PRIMARY SCHOOL","MUNG'ANG'A PRIMARY SCHOOL","BUMINI PRIMARY",
@@ -36,25 +36,44 @@ const POLLING_CENTRES: Record<string, string[]> = {
   ],
 };
 
-// ALL 12 KAKAMEGA SUB-COUNTIES + WARDS
-const WARDS: Record<string, string[]> = {
-  "Mumias East": ["East Wanga", "Lusheya/Lubinu", "Malaha/Isongo/Makunga"],
-  "Mumias West": ["Mumias Central", "Mumias North", "Etenje", "Musanda"],
-  "Matungu": ["Koyonzo", "Kholera", "Khalaba", "Mayoni", "Namamali"],
-  "Butere": ["Marama West", "Marama Central", "Marama South", "Marama North", "Marama East"],
-  "Khwisero": ["Kisa West", "Kisa East", "Kisa Central", "Kisa North"],
-  "Shinyalu": ["Murhanda", "Isukha West", "Isukha East", "Isukha South", "Isukha Central", "Isukha North"],
-  "Ikolomani": ["Idakho South", "Idakho East", "Idakho North", "Idakho Central"],
-  "Lurambi": ["Butsotso East", "Butsotso South", "Butsotso Central", "Shieywe", "Mahiakalo", "Shirere"],
-  "Navakholo": ["Bunyala West", "Bunyala East", "Bunyala Central", "Shinoyi-Shikomari-Esumeyia", "Ingotse-Matioli"],
-  "Lugari": ["Mautuma", "Lugari", "Lumakanda", "Chekalini", "Chevaywa", "Lwandeti"],
-  "Likuyani": ["Likuyani", "Sango", "Kongoni", "Nzoia", "Sinoko"],
-  "Malava": ["West Kabras", "Chemuche", "East Kabras", "Butali/Chegulo", "Manda-Shivanga", "Shirugu-Mugai", "South Kabras"],
+// ============ COUNTY -> SUB-COUNTY -> WARD ============
+// From your screenshots - exactly as you sent
+const COUNTIES: Record<string, Record<string, string[]>> = {
+  "Kakamega": {
+    "Lugari": ["Mautuma", "Lugari", "Lumakanda", "Chekalini", "Chevaywa", "Lwandeti"],
+    "Likuyani": ["Likuyani", "Sango", "Kongoni", "Nzoia", "Sinoko"],
+    "Malava": ["West Kabras", "Chemuche", "East Kabras", "Butali/Chegulo", "Manda-Shivanga", "Shirugu-Mugai", "South Kabras"],
+    "Lurambi": ["Butsotso East", "Butsotso South", "Butsotso Central", "Shieywe", "Mahiakalo", "Shirere"],
+    "Navakholo": ["Bunyala West", "Bunyala East", "Bunyala Central", "Shinoyi-Shikomari-Esumeyia", "Ingotse-Matioli"],
+    "Mumias West": ["Mumias Central", "Mumias North", "Etenje", "Musanda"],
+    // Mumias East - order exactly as your 3rd screenshot
+    "Mumias East": ["Lusheya/Lubinu", "Malaha/Isongo/Makunga", "East Wanga"],
+    "Matungu": ["Koyonzo", "Kholera", "Khalaba", "Mayoni", "Namamali"],
+    "Butere": ["Marama West", "Marama Central", "Marama South", "Marama North", "Marama East"],
+    "Khwisero": ["Kisa West", "Kisa East", "Kisa Central", "Kisa North"],
+    "Shinyalu": ["Murhanda", "Isukha West", "Isukha East", "Isukha South", "Isukha Central", "Isukha North"],
+    "Ikolomani": ["Idakho South", "Idakho East", "Idakho North", "Idakho Central"],
+  },
+  // Other counties from your 1st screenshot - sub-counties known,
+  // wards to be added when you send their screenshots like you did for Kakamega
+  "Trans Nzoia": {
+    "Kwanza": [], "Endebess": [], "Saboti": [], "Kiminini": [], "Cherangany": [],
+  },
+  "Vihiga": {
+    "Vihiga": [], "Sabatia": [], "Hamisi": [], "Luanda": [], "Emuhaya": [],
+  },
+  "Bungoma": {
+    "Mt Elgon": [], "Sirisia": [], "Kabuchai": [], "Bumula": [], "Kanduyi": [],
+    "Webuye East": [], "Webuye West": [], "Kimilili": [], "Tongaren": [],
+  },
+  "Busia": {
+    "Teso North": [], "Teso South": [], "Nambale": [], "Matayos": [],
+    "Butula": [], "Funyula": [], "Budalangi": [],
+  },
 };
-const SUBCOUNTIES = Object.keys(WARDS);
+const COUNTY_LIST = ["Trans Nzoia", "Kakamega", "Vihiga", "Bungoma", "Busia"];
 const RACES = ["Governor", "Senator", "Woman Rep", "MP", "MCA"];
 
-// Total streams per sub-county - IEBC 2022 register
 const TOTAL_STREAMS_BY_SUB: Record<string, number> = {
   "Mumias East": 95,
   "Mumias West": 118, "Matungu": 140, "Butere": 121, "Khwisero": 115,
@@ -77,9 +96,12 @@ function normalize(s: any) {
 export default function Home() {
   const [results, setResults] = useState<any[]>([]);
   const [tab, setTab] = useState("MCA");
+  const [county, setCounty] = useState("Kakamega");
   const [sub, setSub] = useState("Mumias East");
   const [wardFilter, setWardFilter] = useState("All Wards");
 
+  const SUBCOUNTIES = Object.keys(COUNTIES[county] || {});
+  const WARDS_FOR_SUB = COUNTIES[county]?.[sub] || [];
   const TOTAL_STREAMS = TOTAL_STREAMS_BY_SUB[sub] || 95;
 
   useEffect(() => {
@@ -118,18 +140,17 @@ export default function Home() {
   const headerData = getTally(tab, isCountyRace ? undefined : sub, tab === "MCA" ? (wardFilter === "All Wards" ? undefined : wardFilter) : undefined);
   const leading: any = headerData.sorted[0];
   const pctReported = TOTAL_STREAMS ? ((headerData.stns / TOTAL_STREAMS) * 100).toFixed(1) : "0.0";
-  const wardsToShow = tab === "MCA" ? (wardFilter === "All Wards" ? WARDS[sub] : [wardFilter]) : [WARDS[sub][0]];
+  const wardsToShow = tab === "MCA" ? (wardFilter === "All Wards" ? WARDS_FOR_SUB : [wardFilter]) : [WARDS_FOR_SUB[0] || sub];
 
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(180deg,#f0fdf4 0%,#ffffff 40%,#f8fafc 100%)", fontFamily: "system-ui,-apple-system,Segoe UI,Roboto,sans-serif", paddingBottom: 40 }}>
-      {/* TOP BAR */}
       <div style={{ background: "#0f172a", color: "#fff", padding: "14px 16px", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ width: 38, height: 38, background: "#16a34a", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🗳️</div>
             <div>
               <div style={{ fontWeight: 900, fontSize: 18, letterSpacing: 1 }}>HAKITALY</div>
-              <div style={{ fontSize: 11, opacity: 0.7 }}>Kakamega County • Live Tally • Form 34A</div>
+              <div style={{ fontSize: 11, opacity: 0.7 }}>{county} County • Live Tally • Form 34A</div>
             </div>
           </div>
           <div style={{ background: "#dc2626", padding: "5px 10px", borderRadius: 20, fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", gap: 6 }}>
@@ -139,9 +160,8 @@ export default function Home() {
       </div>
 
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 16px" }}>
-        {/* HERO CARD */}
         <div style={{ background: "linear-gradient(135deg,#0f172a 0%,#14532d 60%,#16a34a 100%)", color: "#fff", borderRadius: 20, padding: 24, marginTop: 20, boxShadow: "0 12px 30px rgba(0,0,0,0.18)", textAlign: "center" }}>
-          <div style={{ fontSize: 12, letterSpacing: 2, opacity: 0.8, fontWeight: 700 }}>{tab.toUpperCase()} • {sub.toUpperCase()}</div>
+          <div style={{ fontSize: 12, letterSpacing: 2, opacity: 0.8, fontWeight: 700 }}>{tab.toUpperCase()} • {sub.toUpperCase()} • {county.toUpperCase()}</div>
           <div style={{ fontSize: 42, fontWeight: 900, margin: "8px 0 4px", lineHeight: 1 }}>{headerData.stns} <span style={{ fontSize: 20, opacity: 0.7 }}>/ {TOTAL_STREAMS}</span></div>
           <div style={{ fontSize: 14, opacity: 0.9 }}>stations reported • {pctReported}% counted</div>
           <div style={{ background: "rgba(255,255,255,0.2)", height: 10, borderRadius: 10, marginTop: 14, overflow: "hidden" }}>
@@ -151,31 +171,32 @@ export default function Home() {
             {leading ? <>🏆 Leading: <b>{leading[0]}</b> — <b>{leading[1].toLocaleString()} votes</b></> : "No results yet for this race — waiting for first 34A"}
           </div>
           <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 14, flexWrap: "wrap" }}>
-            <span style={{ background: "#fff", color: "#111", padding: "5px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{sub === "Mumias East" ? "52 Polling Centres" : `${WARDS[sub].length} Wards`}</span>
+            <span style={{ background: "#fff", color: "#111", padding: "5px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{sub === "Mumias East" ? "52 Polling Centres" : `${WARDS_FOR_SUB.length} Wards`}</span>
             <span style={{ background: "#fff", color: "#111", padding: "5px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{TOTAL_STREAMS} Streams</span>
             <span style={{ background: "#facc15", color: "#111", padding: "5px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{headerData.total.toLocaleString()} Votes Counted</span>
           </div>
         </div>
 
-        {/* RACE TABS */}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", margin: "20px 0 12px" }}>
           {RACES.map((r) => (
             <button key={r} onClick={() => setTab(r)} style={{ padding: "10px 18px", borderRadius: 30, background: tab === r ? "#16a34a" : "#fff", color: tab === r ? "#fff" : "#334155", border: tab === r ? "none" : "1px solid #e2e8f0", fontWeight: 800, fontSize: 13, cursor: "pointer", boxShadow: tab === r ? "0 6px 16px rgba(22,163,74,0.35)" : "0 2px 6px rgba(0,0,0,0.05)" }}>{r}</button>
           ))}
         </div>
 
-        {/* FILTERS */}
+        {/* COUNTY -> SUB-COUNTY -> WARD - 3 dropdowns in order */}
         <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+          <select value={county} onChange={(e) => { const c = e.target.value; setCounty(c); const firstSub = Object.keys(COUNTIES[c])[0]; setSub(firstSub); setWardFilter("All Wards"); }} style={{ padding: "11px 14px", borderRadius: 12, border: "1px solid #e2e8f0", background: "#fff", fontWeight: 700 }}>
+            {COUNTY_LIST.map((c) => <option key={c}>{c}</option>)}
+          </select>
           <select value={sub} onChange={(e) => { setSub(e.target.value); setWardFilter("All Wards"); }} style={{ padding: "11px 14px", borderRadius: 12, border: "1px solid #e2e8f0", background: "#fff", fontWeight: 700 }}>
             {SUBCOUNTIES.map((s) => <option key={s}>{s}</option>)}
           </select>
           <select value={wardFilter} onChange={(e) => setWardFilter(e.target.value)} style={{ padding: "11px 14px", borderRadius: 12, border: "1px solid #e2e8f0", background: "#fff", fontWeight: 700 }}>
             <option>All Wards</option>
-            {WARDS[sub].map((w) => <option key={w}>{w}</option>)}
+            {WARDS_FOR_SUB.map((w) => <option key={w}>{w}</option>)}
           </select>
         </div>
 
-        {/* RESULT CARDS */}
         {wardsToShow.map((w) => {
           const d = getTally(tab, isCountyRace ? undefined : sub, tab === "MCA" ? w : undefined);
           const wardLeader: any = d.sorted[0];
@@ -186,11 +207,10 @@ export default function Home() {
                 <div>
                   <div style={{ fontSize: 12, color: "#16a34a", fontWeight: 800, letterSpacing: 1 }}>{tab.toUpperCase()} RACE</div>
                   <h3 style={{ margin: "4px 0 2px", fontSize: 20 }}>{tab === "MCA" ? `${w} Ward` : sub}</h3>
-                  <div style={{ fontSize: 12, color: "#64748b" }}>{tab === "MCA" ? (centresCount ? `${centresCount} IEBC centres in this ward` : "IEBC centres coming soon") : "Kakamega County"}</div>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>{tab === "MCA" ? (centresCount ? `${centresCount} IEBC centres in this ward` : "IEBC centres coming soon") : `${county} County • ${sub}`}</div>
                 </div>
                 <div style={{ background: "#f0fdf4", color: "#15803d", padding: "6px 12px", borderRadius: 20, fontSize: 12, fontWeight: 800 }}>{d.stns} stns • {d.total.toLocaleString()} votes</div>
               </div>
-
               {d.sorted.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "24px 0", color: "#94a3b8" }}>
                   <div style={{ fontSize: 32 }}>📭</div>
@@ -226,8 +246,7 @@ export default function Home() {
             </div>
           );
         })}
-
-        <p style={{ textAlign: "center", fontSize: 11, color: "#94a3b8", marginTop: 24 }}>HAKITALY • Source: IEBC Form 34A • Kakamega County: 12 Sub-Counties • Updates every 15s</p>
+        <p style={{ textAlign: "center", fontSize: 11, color: "#94a3b8", marginTop: 24 }}>HAKITALY • Source: IEBC Form 34A • Western Region: 5 Counties • Updates every 15s</p>
       </div>
     </div>
   );
