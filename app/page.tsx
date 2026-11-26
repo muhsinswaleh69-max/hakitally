@@ -11,6 +11,21 @@ const GOV = [
   { name:"Suleiman Sumba (KANU)" },
 ];
 
+// NEW - SAME FORMAT AS GOV
+const SENATOR = [
+  { name:"Boni Khalwale (UDA)" },
+  { name:"George Aladwa (ODM)" },
+  { name:"Seth Panyako (DCP)" },
+  { name:"Elsie Muhanda (ANC)" },
+];
+
+const WOMANREP = [
+  { name:"Elsie Muhanda (ODM)" },
+  { name:"Beatrice Adagala (UDA)" },
+  { name:"Rhodah Ndeso (DCP)" },
+  { name:"Caroline Simiyu (ANC)" },
+];
+
 const MP2022:any = {
   "Mumias East":["Peter Nabulindo (ODM)","Benjamin Washiali (UDA)","David Were (DCP)"],
   "Mumias West":["Johnson Naicca (ODM)","Rashid Echesa (UDA)","Tim Wanyonyi (DCP)"],
@@ -78,6 +93,55 @@ export default function Page(){
   const leadingItem=govData.sorted[0] as any;
   const leadingName=leadingItem? leadingItem[0] : "-";
 
+  // Helper: Get candidate list for current tab
+  const getCandidatesForTab = () => {
+    if(tab==="Governor") return GOV.map(c=>c.name);
+    if(tab==="Senator") return SENATOR.map(c=>c.name);
+    if(tab==="Woman Rep") return WOMANREP.map(c=>c.name);
+    return [];
+  };
+
+  // Helper: Render Ward Cards - SAME AS MCA, FOR GOV / SENATOR / WOMAN REP
+  const renderWardCards = (raceName: string, candidates: string[], formLabel: string) => {
+    const wardsToShow = wardFilter.includes("All Wards") ? WARDS[sub] : [wardFilter];
+    return (
+      <div>
+        {/* County Total Bar - on top, same as your header logic */}
+        <div className="bg-white rounded-xl p-3 mb-3">
+          <p className="text-[12px] font-bold">{raceName} - {sub} Total</p>
+          <p className="text-[11px] text-gray-500">{getTally(raceName, sub).stns} stations in {sub} | {getTally(raceName, sub).total.toLocaleString()} total valid votes</p>
+        </div>
+        {wardsToShow.map((w:string)=>{
+          const m=getTally(raceName, sub, w);
+          return(
+            <div key={w} className="bg-white rounded-2xl p-4 border-l-4 border-l-[#0a3d1f] mb-3">
+              <p className="font-bold text-[13px]">{w} Ward - {sub} - {raceName} Race - {m.stns} stns reported</p>
+              <div className="mt-3">
+                {candidates.map((c:any)=>{
+                  const v=m.tally[c]||0;
+                  const pct=m.total? ((v/m.total)*100).toFixed(1) : "0.0";
+                  return(
+                    <div key={c} className="bg-[#f8f9fa] rounded-xl p-3 mb-2">
+                      <p className="text-[13px]">{c}</p>
+                      <div className="flex justify-between">
+                        <span className="font-bold text-[13px]">{v.toLocaleString()} votes</span>
+                        <span className="font-bold text-[13px] text-[#0a3d1f]">{pct}%</span>
+                      </div>
+                      <div className="w-full h-2 bg-gray-200 rounded-full mt-2">
+                        <div className="h-full bg-[#0a3d1f] rounded-full" style={{width:`${pct}%`}}></div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {m.stns===0 && <p className="text-[11px] text-gray-400 mt-2">No {formLabel} yet - Enter via /admin</p>}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   return(
     <div className="min-h-screen bg-[#f0f2f5]">
       <div className="bg-[#0a3d1f] text-white rounded-[20px] m-3 p-6 text-center">
@@ -96,38 +160,32 @@ export default function Page(){
       </div>
 
       <div className="p-3 max-w-[800px] mx-auto">
-        {(tab==="MP"||tab==="MCA") && (
-          <div className="bg-white rounded-xl p-3 mb-3">
-            <div className="flex gap-2 flex-wrap">
-              {Object.keys(WARDS).map((sc:any)=>(
-                <button key={sc} onClick={()=>{setSub(sc); setWardFilter(`All Wards in ${sc}`);}} className={`px-3 py-1 rounded-full text-[11px] font-bold ${sub===sc? "bg-black text-white" : "bg-gray-100"}`}>{sc}</button>
+        {/* SHOW CONSTITUENCY + WARD FILTER FOR ALL TABS NOW - NOT JUST MP/MCA */}
+        <div className="bg-white rounded-xl p-3 mb-3">
+          <div className="flex gap-2 flex-wrap">
+            {Object.keys(WARDS).map((sc:any)=>(
+              <button key={sc} onClick={()=>{setSub(sc); setWardFilter(`All Wards in ${sc}`);}} className={`px-3 py-1 rounded-full text-[11px] font-bold ${sub===sc? "bg-black text-white" : "bg-gray-100"}`}>{sc}</button>
+            ))}
+          </div>
+          {/* Ward filter for Gov / Senator / Woman Rep / MCA */}
+          {tab!=="MP" && (
+            <div className="flex gap-2 flex-wrap mt-2 border-t pt-2">
+              <button onClick={()=>setWardFilter(`All Wards in ${sub}`)} className={`px-3 py-1 rounded-full text-[11px] font-bold ${wardFilter.includes("All Wards")? "bg-black text-white" : "bg-gray-100"}`}>All Wards in {sub}</button>
+              {(WARDS[sub]||[]).map((w:any)=>(
+                <button key={w} onClick={()=>setWardFilter(w)} className={`px-3 py-1 rounded-full text-[11px] font-bold ${wardFilter===w? "bg-black text-white" : "bg-gray-100"}`}>{w}</button>
               ))}
             </div>
-            {tab==="MCA" && (
-              <div className="flex gap-2 flex-wrap mt-2 border-t pt-2">
-                <button onClick={()=>setWardFilter(`All Wards in ${sub}`)} className={`px-3 py-1 rounded-full text-[11px] font-bold ${wardFilter.includes("All Wards")? "bg-black text-white" : "bg-gray-100"}`}>All Wards in {sub}</button>
-                {(WARDS[sub]||[]).map((w:any)=>(
-                  <button key={w} onClick={()=>setWardFilter(w)} className={`px-3 py-1 rounded-full text-[11px] font-bold ${wardFilter===w? "bg-black text-white" : "bg-gray-100"}`}>{w}</button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
 
-        {tab==="Governor" && (
-          <div className="grid grid-cols-2 gap-3">
-            {GOV.map((c:any)=>{
-              const v=govData.tally[c.name]||0;
-              const pct=govData.total? Math.round((v/govData.total)*100) : 0;
-              return(
-                <div key={c.name} className="bg-white rounded-xl p-4 border-l-4 border-l-[#0a3d1f]">
-                  <p className="text-[12px]">{c.name}</p>
-                  <p className="font-black text-[20px]">{v.toLocaleString()} <span className="text-[12px]">{pct}%</span></p>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        {/* GOVERNOR - NOW SAME AS MCA: PER WARD WITH % */}
+        {tab==="Governor" && renderWardCards("Governor", GOV.map(c=>c.name), "Form 34A")}
+
+        {/* SENATOR - NOW SAME AS MCA */}
+        {tab==="Senator" && renderWardCards("Senator", SENATOR.map(c=>c.name), "Form 34A")}
+
+        {/* WOMAN REP - NOW SAME AS MCA */}
+        {tab==="Woman Rep" && renderWardCards("Woman Rep", WOMANREP.map(c=>c.name), "Form 34A")}
 
         {tab==="MP" && (
           <div className="space-y-3">
@@ -182,13 +240,6 @@ export default function Page(){
                 </div>
               );
             })}
-          </div>
-        )}
-
-        {(tab==="Senator"||tab==="Woman Rep") && (
-          <div className="bg-white rounded-xl p-4">
-            <p className="font-bold text-[13px]">{tab} Live - {getTally(tab).stns} stns</p>
-            <p className="text-[11px] text-gray-400 mt-2">Enter via /admin - {tab}</p>
           </div>
         )}
       </div>
