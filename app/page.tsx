@@ -7,7 +7,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// POLLING CENTRES - const only, NO export in a page file
+// POLLING CENTRES - const only, NO export in page file
 const POLLING_CENTRES: Record<string, string[]> = {
   "East Wanga": [
     "MUKAMBI PRIMARY SCHOOL","MUNG'ANG'A PRIMARY SCHOOL","BUMINI PRIMARY",
@@ -41,14 +41,23 @@ const WARDS: Record<string, string[]> = {
 };
 const RACES = ["Governor", "Senator", "Woman Rep", "MP", "MCA"];
 const TOTAL_STREAMS = 95;
+const TOTAL_CENTRES = 52;
 
+const PARTY_COLORS: Record<string, string> = {
+  "ODM": "#f97316", "UDA": "#16a34a", "DCP": "#2563eb",
+  "ANC": "#dc2626", "FORD": "#9333ea", "WIPER": "#0891b2",
+};
+function partyColor(name: string) {
+  for (const p of Object.keys(PARTY_COLORS)) if (name.includes(p)) return PARTY_COLORS[p];
+  return "#16a34a";
+}
 function normalize(s: any) {
   return String(s || "").toLowerCase().replace(/[^a-z]/g, "").trim();
 }
 
 export default function Home() {
   const [results, setResults] = useState<any[]>([]);
-  const [tab, setTab] = useState("MP");
+  const [tab, setTab] = useState("MCA");
   const [sub, setSub] = useState("Mumias East");
   const [wardFilter, setWardFilter] = useState("All Wards");
 
@@ -86,55 +95,117 @@ export default function Home() {
 
   const headerData = getTally(tab, tab === "Governor" || tab === "Senator" || tab === "Woman Rep" ? undefined : sub, tab === "MCA" ? (wardFilter === "All Wards" ? undefined : wardFilter) : undefined);
   const leading: any = headerData.sorted[0];
-
-  const wardsToShow = wardFilter === "All Wards" ? WARDS[sub] : [wardFilter];
+  const pctReported = ((headerData.stns / TOTAL_STREAMS) * 100).toFixed(1);
+  const wardsToShow = tab === "MCA" ? (wardFilter === "All Wards" ? WARDS[sub] : [wardFilter]) : [WARDS[sub][0]];
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: 16, fontFamily: "system-ui" }}>
-      <h1 style={{ textAlign: "center" }}>HAKITALY — Mumias East Live Tally</h1>
-      <div style={{ textAlign: "center", background: "#111", color: "#fff", padding: 16, borderRadius: 12 }}>
-        <div style={{ fontSize: 32, fontWeight: 800 }}>{headerData.stns} / {TOTAL_STREAMS} stations reported</div>
-        <div>{leading ? `Leading: ${leading[0]} — ${leading[1]} votes` : "No results yet for this race"}</div>
-      </div>
-
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", margin: "16px 0" }}>
-        {RACES.map((r) => (
-          <button key={r} onClick={() => setTab(r)} style={{ padding: "8px 14px", borderRadius: 20, background: tab === r ? "#16a34a" : "#eee", color: tab === r ? "#fff" : "#000", border: "none", fontWeight: 700 }}>{r}</button>
-        ))}
-      </div>
-
-      <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-        <select value={sub} onChange={(e) => { setSub(e.target.value); setWardFilter("All Wards"); }} style={{ padding: 10, borderRadius: 8 }}>
-          <option>Mumias East</option>
-        </select>
-        <select value={wardFilter} onChange={(e) => setWardFilter(e.target.value)} style={{ padding: 10, borderRadius: 8 }}>
-          <option>All Wards</option>
-          {WARDS[sub].map((w) => <option key={w}>{w}</option>)}
-        </select>
-      </div>
-
-      {wardsToShow.map((w) => {
-        const d = getTally(tab, tab === "Governor" || tab === "Senator" || tab === "Woman Rep" ? undefined : sub, tab === "MCA" ? w : undefined);
-        // For MP/Governor etc, ward breakdown is not used, show once
-        if (tab !== "MCA" && w !== wardsToShow[0]) return null;
-        return (
-          <div key={w} style={{ border: "1px solid #ddd", borderRadius: 12, padding: 16, marginTop: 16 }}>
-            <h3>{tab === "MCA" ? `${w} Ward` : `${sub}`} — {tab} Race — {d.stns} stns reported</h3>
-            {d.sorted.length === 0 && <p>No results yet.</p>}
-            {d.sorted.map(([name, votes]: any) => {
-              const pct = d.total ? ((votes / d.total) * 100).toFixed(1) : "0.0";
-              return (
-                <div key={name} style={{ marginBottom: 10 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}><b>{name}</b><span>{votes} votes — {pct}%</span></div>
-                  <div style={{ background: "#eee", height: 12, borderRadius: 6 }}><div style={{ width: `${pct}%`, background: "#16a34a", height: 12, borderRadius: 6 }} /></div>
-                </div>
-              );
-            })}
-            <div style={{ fontSize: 12, color: "#666" }}>Total counted: {d.total} votes • Centres in this ward: {tab === "MCA" ? POLLING_CENTRES[w]?.length : "—"}</div>
+    <div style={{ minHeight: "100vh", background: "linear-gradient(180deg,#f0fdf4 0%,#ffffff 40%,#f8fafc 100%)", fontFamily: "system-ui,-apple-system,Segoe UI,Roboto,sans-serif", paddingBottom: 40 }}>
+      {/* TOP BAR */}
+      <div style={{ background: "#0f172a", color: "#fff", padding: "14px 16px", position: "sticky", top: 0, zIndex: 10 }}>
+        <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 38, height: 38, background: "#16a34a", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🗳️</div>
+            <div>
+              <div style={{ fontWeight: 900, fontSize: 18, letterSpacing: 1 }}>HAKITALY</div>
+              <div style={{ fontSize: 11, opacity: 0.7 }}>Mumias East • Live Tally • Form 34A</div>
+            </div>
           </div>
-        );
-      })}
-      <p style={{ textAlign: "center", fontSize: 12, color: "#888", marginTop: 20 }}>Source: Form 34A • IEBC Polling Centres Mumias East: 52 centres, 95 streams</p>
+          <div style={{ background: "#dc2626", padding: "5px 10px", borderRadius: 20, fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 8, height: 8, background: "#fff", borderRadius: "50%", display: "inline-block" }} /> LIVE
+          </div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 16px" }}>
+        {/* HERO CARD */}
+        <div style={{ background: "linear-gradient(135deg,#0f172a 0%,#14532d 60%,#16a34a 100%)", color: "#fff", borderRadius: 20, padding: 24, marginTop: 20, boxShadow: "0 12px 30px rgba(0,0,0,0.18)", textAlign: "center" }}>
+          <div style={{ fontSize: 12, letterSpacing: 2, opacity: 0.8, fontWeight: 700 }}>{tab.toUpperCase()} • {sub.toUpperCase()}</div>
+          <div style={{ fontSize: 42, fontWeight: 900, margin: "8px 0 4px", lineHeight: 1 }}>{headerData.stns} <span style={{ fontSize: 20, opacity: 0.7 }}>/ {TOTAL_STREAMS}</span></div>
+          <div style={{ fontSize: 14, opacity: 0.9 }}>stations reported • {pctReported}% counted</div>
+          <div style={{ background: "rgba(255,255,255,0.2)", height: 10, borderRadius: 10, marginTop: 14, overflow: "hidden" }}>
+            <div style={{ width: `${pctReported}%`, background: "#facc15", height: 10, borderRadius: 10, transition: "width 0.5s" }} />
+          </div>
+          <div style={{ marginTop: 16, background: "rgba(255,255,255,0.12)", padding: "10px 14px", borderRadius: 12, fontSize: 14 }}>
+            {leading ? <>🏆 Leading: <b>{leading[0]}</b> — <b>{leading[1].toLocaleString()} votes</b></> : "No results yet for this race — waiting for first 34A"}
+          </div>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 14, flexWrap: "wrap" }}>
+            <span style={{ background: "#fff", color: "#111", padding: "5px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{TOTAL_CENTRES} Polling Centres</span>
+            <span style={{ background: "#fff", color: "#111", padding: "5px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{TOTAL_STREAMS} Streams</span>
+            <span style={{ background: "#facc15", color: "#111", padding: "5px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{headerData.total.toLocaleString()} Votes Counted</span>
+          </div>
+        </div>
+
+        {/* RACE TABS */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", margin: "20px 0 12px" }}>
+          {RACES.map((r) => (
+            <button key={r} onClick={() => setTab(r)} style={{ padding: "10px 18px", borderRadius: 30, background: tab === r ? "#16a34a" : "#fff", color: tab === r ? "#fff" : "#334155", border: tab === r ? "none" : "1px solid #e2e8f0", fontWeight: 800, fontSize: 13, cursor: "pointer", boxShadow: tab === r ? "0 6px 16px rgba(22,163,74,0.35)" : "0 2px 6px rgba(0,0,0,0.05)" }}>{r}</button>
+          ))}
+        </div>
+
+        {/* FILTERS */}
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+          <select value={sub} onChange={(e) => { setSub(e.target.value); setWardFilter("All Wards"); }} style={{ padding: "11px 14px", borderRadius: 12, border: "1px solid #e2e8f0", background: "#fff", fontWeight: 700 }}>
+            <option>Mumias East</option>
+          </select>
+          <select value={wardFilter} onChange={(e) => setWardFilter(e.target.value)} style={{ padding: "11px 14px", borderRadius: 12, border: "1px solid #e2e8f0", background: "#fff", fontWeight: 700 }}>
+            <option>All Wards</option>
+            {WARDS[sub].map((w) => <option key={w}>{w}</option>)}
+          </select>
+        </div>
+
+        {/* RESULT CARDS */}
+        {wardsToShow.map((w) => {
+          const d = getTally(tab, tab === "Governor" || tab === "Senator" || tab === "Woman Rep" ? undefined : sub, tab === "MCA" ? w : undefined);
+          const wardLeader: any = d.sorted[0];
+          return (
+            <div key={w} style={{ background: "#fff", borderRadius: 20, padding: 20, marginTop: 18, boxShadow: "0 8px 24px rgba(0,0,0,0.07)", border: "1px solid #f1f5f9" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+                <div>
+                  <div style={{ fontSize: 12, color: "#16a34a", fontWeight: 800, letterSpacing: 1 }}>{tab.toUpperCase()} RACE</div>
+                  <h3 style={{ margin: "4px 0 2px", fontSize: 20 }}>{tab === "MCA" ? `${w} Ward` : sub}</h3>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>{tab === "MCA" ? `${POLLING_CENTRES[w]?.length || 0} IEBC centres in this ward` : "Mumias East Constituency"}</div>
+                </div>
+                <div style={{ background: "#f0fdf4", color: "#15803d", padding: "6px 12px", borderRadius: 20, fontSize: 12, fontWeight: 800 }}>{d.stns} stns • {d.total.toLocaleString()} votes</div>
+              </div>
+
+              {d.sorted.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "24px 0", color: "#94a3b8" }}>
+                  <div style={{ fontSize: 32 }}>📭</div>
+                  <div style={{ marginTop: 8 }}>No results yet — waiting for first 34A from this ward</div>
+                </div>
+              ) : (
+                <div style={{ marginTop: 16 }}>
+                  {d.sorted.map(([name, votes]: any, idx: number) => {
+                    const pct = d.total ? ((votes / d.total) * 100).toFixed(1) : "0.0";
+                    const color = partyColor(String(name));
+                    return (
+                      <div key={name} style={{ marginBottom: 16 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <span style={{ width: 28, height: 28, borderRadius: "50%", background: idx === 0 ? "#facc15" : "#e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 13 }}>{idx + 1}</span>
+                            <b style={{ fontSize: 15 }}>{name}</b>
+                            {idx === 0 && <span style={{ background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 800 }}>LEADING</span>}
+                          </div>
+                          <div style={{ textAlign: "right" }}><b>{Number(votes).toLocaleString()}</b> <span style={{ color: "#64748b", fontSize: 13 }}>• {pct}%</span></div>
+                        </div>
+                        <div style={{ background: "#f1f5f9", height: 12, borderRadius: 10, marginTop: 8, overflow: "hidden" }}>
+                          <div style={{ width: `${pct}%`, background: color, height: 12, borderRadius: 10 }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 12, display: "flex", justifyContent: "space-between", fontSize: 12, color: "#94a3b8" }}>
+                <span>Total counted: {d.total.toLocaleString()} votes</span>
+                {wardLeader && <span>Leader: {wardLeader[0]}</span>}
+              </div>
+            </div>
+          );
+        })}
+
+        <p style={{ textAlign: "center", fontSize: 11, color: "#94a3b8", marginTop: 24 }}>HAKITALY • Source: IEBC Form 34A • Mumias East: 52 Centres • 95 Streams • Updates every 15s</p>
+      </div>
     </div>
   );
 }
